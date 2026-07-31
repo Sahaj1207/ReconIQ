@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reconiq-backend"
+version = "0.1.0"
+description = "ReconIQ - Enterprise Threat Analysis Platform Backend Architecture. Evidence. Intelligence. Trust."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "ReconIQ Security Team" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.1.0",
+    "phonenumbers>=8.13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.26.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
