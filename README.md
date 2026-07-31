@@ -1,4 +1,8 @@
-# ReconIQ - Enterprise Threat Analysis Platform Backend
+# ReconIQ
+
+### Enterprise Cybersecurity Investigation Platform
+
+**Evidence. Intelligence. Trust.**
 
 > **Tagline**: *Evidence. Intelligence. Trust.*
 
