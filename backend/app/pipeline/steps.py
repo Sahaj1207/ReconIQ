@@ -1,45 +1,173 @@
 """
-ReconIQ Modular Investigation Steps
+ReconIQ Pipeline Step Abstractions
 
 Purpose:
-Defines abstract interface and concrete modular steps for individual investigation pipeline stages.
+Modular abstractions for individual pipeline execution steps:
+- EvidenceCollectionStep
+- NormalizationStep
+- ValidationStep
+- ThreatIntelStep
+- RiskAssessmentStep
 
 Responsibilities:
-- Provide clean execution contracts for individual steps (ExtractEvidenceStep, EnrichIntelStep, EvaluateRiskStep)
-- Standardize step input validation and output propagation
+- Provide clean execution contract via BasePipelineStep abstract class
+- Execute stage logic independently using specialized system components
+- Update InvestigationContext state without exposing raw internal errors or keys
 
-Future Implementation Notes:
-- Dynamic step registration via configuration or feature flags.
-
-TODO:
-- [ ] Implement BasePipelineStep abstract class.
-- [ ] Add ExtractEvidenceStep implementation.
-- [ ] Add ThreatIntelEnrichmentStep implementation.
-- [ ] Add RiskAssessmentStep implementation.
+Future Extension Notes:
+- Extension guide: Subclass BasePipelineStep, implement name and async execute(context),
+  and register step with InvestigationPipeline orchestrator.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+import logging
+from typing import Dict, Any, Optional
+
+from app.pipeline.context import InvestigationContext
+from app.ingestion.collector import EvidenceCollector
+from app.utils.normalizer import Normalizer
+from app.validators.validator import Validator
+from app.integrations.manager import ThreatIntelManager
+from app.integrations.providers.virustotal import VirusTotalProvider
+from app.risk_engine.scorer import RiskScorer
+
+logger = logging.getLogger(__name__)
 
 
 class BasePipelineStep(ABC):
-    """Abstract base class for individual pipeline steps."""
+    """
+    Abstract Base Class for all Investigation Pipeline Steps.
+    """
 
     @property
     @abstractmethod
-    def step_name(self) -> str:
-        """Unique identifier for the step."""
+    def name(self) -> str:
+        """Returns unique identifier name for the pipeline step."""
         pass
 
     @abstractmethod
-    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, context: InvestigationContext) -> None:
         """
-        Executes step logic modifying or enriching investigation context.
+        Executes step logic modifying or enriching InvestigationContext state.
 
         Args:
-            context (Dict[str, Any]): Active investigation context.
-
-        Returns:
-            Dict[str, Any]: Updated context.
+            context (InvestigationContext): Active investigation context.
         """
         pass
+
+
+class EvidenceCollectionStep(BasePipelineStep):
+    """
+    Step 1: Artifact & Input Ingestion / Evidence Collection
+    """
+
+    def __init__(self, collector: Optional[EvidenceCollector] = None) -> None:
+        self.collector = collector or EvidenceCollector()
+
+    @property
+    def name(self) -> str:
+        return "evidence_collection"
+
+    async def execute(self, context: InvestigationContext) -> None:
+        logger.debug(f"[{context.investigation_id}] Executing EvidenceCollectionStep")
+        response = self.collector.collect(context.raw_input)
+        if response and response.results:
+            context.collected_evidence = response.results.model_dump()
+        else:
+            context.collected_evidence = {}
+
+
+class NormalizationStep(BasePipelineStep):
+    """
+    Step 2: Canonical Evidence Normalization
+    """
+
+    @property
+    def name(self) -> str:
+        return "normalization"
+
+    async def execute(self, context: InvestigationContext) -> None:
+        logger.debug(f"[{context.investigation_id}] Executing NormalizationStep")
+        if not context.collected_evidence:
+            context.normalized_evidence = {}
+            return
+
+        normalized = Normalizer.normalize_all(context.collected_evidence)
+        context.normalized_evidence = normalized or {}
+
+
+class ValidationStep(BasePipelineStep):
+    """
+    Step 3: Structural Format & Syntax Validation
+    """
+
+    @property
+    def name(self) -> str:
+        return "validation"
+
+    async def execute(self, context: InvestigationContext) -> None:
+        logger.debug(f"[{context.investigation_id}] Executing ValidationStep")
+        evidence_to_validate = context.normalized_evidence or context.collected_evidence
+        if not evidence_to_validate:
+            context.validation_results = {}
+            return
+
+        validated = Validator.validate_all(evidence_to_validate)
+        context.validation_results = validated or {}
+
+
+class ThreatIntelStep(BasePipelineStep):
+    """
+    Step 4: Threat Intelligence Enrichment Lookups
+    """
+
+    def __init__(self, manager: Optional[ThreatIntelManager] = None) -> None:
+        if manager:
+            self.manager = manager
+        else:
+            # Register default threat intel provider clients
+            self.manager = ThreatIntelManager()
+            try:
+                vt_provider = VirusTotalProvider()
+                self.manager.register_provider(vt_provider)
+            except Exception as exc:
+                logger.warning(f"Could not instantiate default VirusTotal provider in pipeline step: {exc}")
+
+    @property
+    def name(self) -> str:
+        return "threat_intelligence"
+
+    async def execute(self, context: InvestigationContext) -> None:
+        logger.debug(f"[{context.investigation_id}] Executing ThreatIntelStep")
+        evidence_to_enrich = context.validation_results or context.normalized_evidence or context.collected_evidence
+        if not evidence_to_enrich:
+            context.threat_intelligence = {}
+            return
+
+        intel_data = await self.manager.lookup_all(evidence_to_enrich)
+        context.threat_intelligence = intel_data or {}
+
+
+class RiskAssessmentStep(BasePipelineStep):
+    """
+    Step 5: Deterministic Risk Engine Evaluation & Scoring
+    """
+
+    def __init__(self, scorer: Optional[RiskScorer] = None) -> None:
+        self.scorer = scorer or RiskScorer()
+
+    @property
+    def name(self) -> str:
+        return "risk_assessment"
+
+    async def execute(self, context: InvestigationContext) -> None:
+        logger.debug(f"[{context.investigation_id}] Executing RiskAssessmentStep")
+        raw_text_content = context.raw_input.content if hasattr(context.raw_input, "content") else str(context.raw_input)
+
+        assessment = self.scorer.assess(
+            evidence=context.normalized_evidence or context.collected_evidence,
+            validation_results=context.validation_results,
+            intel_results=context.threat_intelligence,
+            raw_text=raw_text_content
+        )
+        context.risk_assessment = assessment

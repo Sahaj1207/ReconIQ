@@ -1,12 +1,14 @@
 """
-ReconIQ Evidence Extraction Endpoint
+ReconIQ Evidence & Investigation Endpoints
 
-HTTP POST /api/v1/evidence/extract
-Ingests raw threat text and returns extracted Indicators of Compromise (IOCs).
+HTTP Endpoints:
+- POST /api/v1/evidence/extract : Extract raw IOC evidence
+- POST /api/v1/evidence/investigate : Run full end-to-end investigation pipeline
 """
 
 from fastapi import APIRouter, HTTPException, status
 from app.schemas.evidence import EvidenceCollectionRequest, EvidenceCollectionResponse
+from app.pipeline.models import InvestigationRequest, InvestigationResult
 from app.services.investigation_service import InvestigationService
 
 router = APIRouter()
@@ -30,4 +32,24 @@ async def extract_evidence(payload: EvidenceCollectionRequest) -> EvidenceCollec
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Evidence extraction processing failure: {str(exc)}"
+        )
+
+
+@router.post(
+    "/investigate",
+    response_model=InvestigationResult,
+    status_code=status.HTTP_200_OK,
+    summary="Execute Full Threat Investigation Pipeline",
+    description="Executes full end-to-end investigation: Evidence Collection -> Normalization -> Validation -> Threat Intel -> Deterministic Risk Engine."
+)
+async def run_investigation(payload: InvestigationRequest) -> InvestigationResult:
+    """
+    Executes full end-to-end ReconIQ investigation pipeline.
+    """
+    try:
+        return await service.investigate(payload)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Investigation pipeline processing failure: {str(exc)}"
         )
