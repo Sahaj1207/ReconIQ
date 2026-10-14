@@ -9,7 +9,13 @@ Responsibilities:
 - Handle logging and error boundaries for request processing
 """
 
-from typing import Union
+import logging
+from typing import Optional, Union
+
+from fastapi.concurrency import run_in_threadpool
+
+from app.core.config import settings
+from app.db.repository import InvestigationRepository
 from app.ingestion.collector import EvidenceCollector
 from app.ingestion.ingested_input import IngestedInput
 from app.pipeline.investigation import InvestigationPipeline
@@ -22,9 +28,20 @@ class InvestigationService:
     Service coordinating ingestion and investigation tasks.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, repository: Optional[InvestigationRepository] = None) -> None:
         self.collector = EvidenceCollector()
         self.pipeline = InvestigationPipeline()
+        self.repository = repository or InvestigationRepository()
+
+    async def _persist(self, result: InvestigationResult) -> InvestigationResult:
+        """Stores the result for history; a storage failure never fails the investigation."""
+        if settings.PERSIST_INVESTIGATIONS:
+            try:
+                await run_in_threadpool(self.repository.save, result)
+            except Exception as exc:
+                logging.getLogger(__name__).error(f"Failed to persist investigation {result.investigation_id}: {exc}")
+                result.warnings.append("Investigation could not be saved to history")
+        return result
 
     def extract_evidence(self, payload: EvidenceCollectionRequest) -> EvidenceCollectionResponse:
         """
@@ -59,8 +76,8 @@ class InvestigationService:
             )
         else:
             req = payload
-        return await self.pipeline.run(req)
+        return await self._persist(await self.pipeline.run(req))
 
     async def investigate_ingested(self, ingested: IngestedInput) -> InvestigationResult:
         """Runs the pipeline on an already-parsed IngestedInput (file uploads)."""
-        return await self.pipeline.run(ingested)
+        return await self._persist(await self.pipeline.run(ingested))

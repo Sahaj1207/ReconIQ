@@ -8,6 +8,7 @@ import os
 
 # Keep the test suite offline: no keyless intel calls, no provider or LLM keys.
 os.environ["INTEL_KEYLESS_PROVIDERS"] = "false"
+os.environ["DATABASE_URL"] = "sqlite://"
 for _key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "URLHAUS_AUTH_KEY", "GOOGLE_SAFE_BROWSING_API_KEY",
              "HIBP_API_KEY", "ANTHROPIC_API_KEY"):
     os.environ[_key] = ""
@@ -31,6 +32,8 @@ def sample_threat_text() -> str:
 @pytest.fixture
 async def async_client():
     """Provides HTTPX async test client for FastAPI endpoint integration testing."""
+    from app.db import init_db
+    init_db()  # ASGITransport does not run the lifespan handler
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test"

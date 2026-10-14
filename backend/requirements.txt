@@ -13,3 +13,7 @@ pillow>=10.0.0
 # Optional OCR: also requires the tesseract-ocr system package
 pytesseract>=0.3.10
 anthropic>=1.13.0
+sqlalchemy>=2.0.25
+fpdf2>=2.7.8
+# PostgreSQL driver (only needed when DATABASE_URL points at Postgres)
+psycopg[binary]>=3.1.18

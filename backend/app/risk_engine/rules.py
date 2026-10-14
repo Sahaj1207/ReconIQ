@@ -313,6 +313,7 @@ class ProviderUnavailableRule(BaseRule):
             for res in items:
                 status = getattr(res, "status", None) or (res.get("status") if isinstance(res, dict) else None)
                 provider = getattr(res, "provider", "intel") if hasattr(res, "provider") else res.get("provider", "intel")
+                status = getattr(status, "value", status)
                 if status in ("FAILED", "UNAVAILABLE", "RATE_LIMITED"):
                     failed_providers.append((provider, status))
 

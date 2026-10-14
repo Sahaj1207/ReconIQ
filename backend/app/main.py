@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.api.v1.router import api_router
+from app.db import init_db
 
 # Setup structured logging
 setup_logging()
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     Application startup and shutdown lifespan context.
     """
     logger.info(f"Starting {settings.APP_NAME} v0.1.0 in [{settings.ENVIRONMENT}] environment.")
+    init_db()
     logger.info("Deterministic Threat Investigation Engine initialized.")
     yield
     logger.info("Shutting down ReconIQ backend services.")

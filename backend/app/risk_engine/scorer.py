@@ -184,7 +184,10 @@ class RiskScorer:
             classification = "no_threat_identified"
         else:
             classification = threat_categories[0]
-        techniques = resolve_techniques(t["id"] for f in findings for t in f.mitre_techniques)
+        # Order techniques by the score contribution of the findings that evidence them
+        techniques = resolve_techniques(
+            t["id"] for f in sorted(findings, key=lambda f: -f.score_impact) for t in f.mitre_techniques
+        )
 
         return RiskAssessment(
             total_score=total_score,

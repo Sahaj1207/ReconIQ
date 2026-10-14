@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     LOG_LEVEL: str = "INFO"
 
+    # Persistence (SQLite by default; use postgresql+psycopg://... in production)
+    DATABASE_URL: str = "sqlite:///./reconiq.db"
+    PERSIST_INVESTIGATIONS: bool = True
+
     # Upload limits
     MAX_UPLOAD_MB: int = 15
 
