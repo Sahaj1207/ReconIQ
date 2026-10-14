@@ -369,7 +369,7 @@ class MultipleSuspiciousArtifactsRule(BaseRule):
         super().__init__(
             rule_id="RULE_EVI_002",
             name="High Artifact Density",
-            description="Payload contains a high density of extracted indicators (>= 5)",
+            description="Payload contains a high density of extracted indicators (>= 8)",
             weight=RiskWeights.MEDIUM,
             severity="MEDIUM"
         )
@@ -378,7 +378,7 @@ class MultipleSuspiciousArtifactsRule(BaseRule):
         evidence = context.get("evidence", {})
         total_count = sum(len(v) for v in evidence.values() if isinstance(v, list))
 
-        if total_count >= 5:
+        if total_count >= 8:
             finding = RiskFinding(
                 finding_id=f"{self.id}_FINDING",
                 title="High Indicator Density Detected",

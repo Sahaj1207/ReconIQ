@@ -164,7 +164,7 @@ Scores are the capped sum of matched rule weights. Severity bands: 0–19 Inform
 | RULE_INT_003 | Threat Intel Provider Failure | INFORMATIONAL | 0 |
 | RULE_INT_004 | Newly Registered Domain (< 30 days) | HIGH | 50 |
 | RULE_EVI_001 | Defanged Indicator Obfuscation Detected | MEDIUM | 25 |
-| RULE_EVI_002 | High Artifact Density (≥ 5) | MEDIUM | 25 |
+| RULE_EVI_002 | High Artifact Density (≥ 8) | MEDIUM | 25 |
 | RULE_EVI_003 | Public IP Address Present | LOW | 10 |
 | RULE_EVI_004 | Brand Impersonation Domain | HIGH | 50 |
 | RULE_EVI_005 | Deceptive Keyword Domain | MEDIUM | 25 |
@@ -220,5 +220,3 @@ docker-compose.yml      Postgres + API + dashboard
 - Outlook `.msg` files aren't parsed; save them as `.eml`.
 - Rate limiting and provider caches are in-process; multi-replica deployments should move them to a shared store.
 - No user accounts or multi-tenancy: access control is shared API keys.
-- `High Artifact Density` fires at five indicators, so ordinary messages containing a link and an email address can
-  score LOW (25).

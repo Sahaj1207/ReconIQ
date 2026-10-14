@@ -33,7 +33,8 @@ class FailingStep(BasePipelineStep):
 async def test_successful_full_investigation():
     """Test successful end-to-end execution of all pipeline stages."""
     pipeline = InvestigationPipeline()
-    payload = "CRITICAL ALERT: Phishing email from attacker[at]malicious-bank[dot]com link hxxps://phishing-portal[.]com/login IP 198.51.100.45"
+    payload = ("Urgent: your account is suspended. Verify your password at "
+               "hxxps://secure-login-verify[.]com/login or contact attacker[at]malicious-bank[dot]com. IP 198.51.100.45")
 
     result = await pipeline.run(payload)
 
@@ -117,7 +118,8 @@ async def test_partial_investigation_result_dto():
 async def test_api_investigate_endpoint(async_client):
     """Integration test for POST /api/v1/evidence/investigate endpoint."""
     payload = {
-        "text": "Phishing email from test[at]example[dot]com containing link hxxps://bad-site[.]com and IP 198.51.100.45",
+        "text": "Your mailbox is locked. Confirm your password immediately at hxxps://account-verify-secure[.]com "
+                "(support test[at]example[dot]com, IP 198.51.100.45)",
         "refang": True
     }
     response = await async_client.post("/api/v1/evidence/investigate", json=payload)
