@@ -83,6 +83,12 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         """Effective SQLAlchemy URL: DATABASE_URL, else POSTGRES_URL, else a local SQLite file."""
         from app.db.urls import normalize_database_url
+        if not (self.DATABASE_URL or self.POSTGRES_URL) and self.serverless:
+            # The deployment bundle is read-only. /tmp works but is per-instance and wiped on cold starts,
+            # so history and job polling are unreliable until a database is connected.
+            import logging
+            logging.getLogger(__name__).warning("No DATABASE_URL or POSTGRES_URL on serverless hosting; using ephemeral /tmp SQLite")
+            return "sqlite:////tmp/reconiq.db"
         return normalize_database_url(self.DATABASE_URL or self.POSTGRES_URL or "sqlite:///./reconiq.db")
 
     @property
