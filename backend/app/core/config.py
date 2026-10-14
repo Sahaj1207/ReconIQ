@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     # Upload limits
     MAX_UPLOAD_MB: int = 15
 
+    # AI Analyst (narrative only; never affects scoring). Uses Claude when a key is set.
+    ANTHROPIC_API_KEY: str = ""
+    ANALYST_ENABLED: bool = True
+    ANALYST_MODEL: str = "claude-opus-5-5"
+    ANALYST_EFFORT: str = "medium"
+    ANALYST_TIMEOUT_SECONDS: float = 60.0
+
     # CORS Configuration
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",

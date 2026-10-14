@@ -102,6 +102,7 @@ class InvestigationContext:
         self.validation_results: Dict[str, Any] = {}
         self.threat_intelligence: Dict[str, Any] = {}
         self.risk_assessment: Optional[Any] = None
+        self.analyst_report: Optional[Dict[str, Any]] = None
 
         # Telemetry & Diagnostics
         self.stage_metrics: List[StageMetric] = []
@@ -228,6 +229,7 @@ class InvestigationContext:
             validation_results=serialized_validation,
             threat_intelligence=serialized_intel,
             risk_assessment=risk_dto,
+            analyst_report=self.analyst_report,
             warnings=self.warnings,
             errors=self.errors,
             execution_metrics=self.stage_metrics

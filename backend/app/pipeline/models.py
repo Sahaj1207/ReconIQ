@@ -74,6 +74,7 @@ class InvestigationResult(BaseModel):
     validation_results: Dict[str, Any] = Field(default_factory=dict, description="Categorized structural validation DTOs")
     threat_intelligence: Dict[str, Any] = Field(default_factory=dict, description="Categorized threat intel provider responses")
     risk_assessment: Optional[Dict[str, Any]] = Field(default=None, description="Full RiskAssessment report DTO")
+    analyst_report: Optional[Dict[str, Any]] = Field(default=None, description="AI Analyst narrative (explanatory only)")
     warnings: List[str] = Field(default_factory=list, description="Accumulated non-fatal warnings")
     errors: List[str] = Field(default_factory=list, description="Accumulated sanitized stage execution errors")
     execution_metrics: List[StageMetric] = Field(default_factory=list, description="Per-stage execution timing & telemetry")

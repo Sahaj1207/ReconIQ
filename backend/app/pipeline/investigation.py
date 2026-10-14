@@ -37,7 +37,8 @@ from app.pipeline.steps import (
     NormalizationStep,
     ValidationStep,
     ThreatIntelStep,
-    RiskAssessmentStep
+    RiskAssessmentStep,
+    AIAnalystStep
 )
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ class InvestigationPipeline:
                 ValidationStep(),
                 ThreatIntelStep(),
                 RiskAssessmentStep(),
+                AIAnalystStep(),
             ]
 
     async def run(

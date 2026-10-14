@@ -31,7 +31,7 @@ class FailingStep(BasePipelineStep):
 
 @pytest.mark.asyncio
 async def test_successful_full_investigation():
-    """Test successful end-to-end execution of all 5 pipeline stages."""
+    """Test successful end-to-end execution of all pipeline stages."""
     pipeline = InvestigationPipeline()
     payload = "CRITICAL ALERT: Phishing email from attacker[at]malicious-bank[dot]com link hxxps://phishing-portal[.]com/login IP 198.51.100.45"
 
@@ -40,7 +40,7 @@ async def test_successful_full_investigation():
     assert result.status == "success"
     assert result.duration_ms > 0.0
     assert result.investigation_id is not None
-    assert len(result.execution_metrics) == 5
+    assert len(result.execution_metrics) == 6
 
     # Check stage ordering
     stage_names = [m.stage_name for m in result.execution_metrics]
@@ -49,7 +49,8 @@ async def test_successful_full_investigation():
         "normalization",
         "validation",
         "threat_intelligence",
-        "risk_assessment"
+        "risk_assessment",
+        "ai_analyst"
     ]
     assert all(m.status == StageStatus.COMPLETED for m in result.execution_metrics)
 
