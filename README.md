@@ -25,7 +25,7 @@ ATT&CK. An AI analyst then explains the result in plain language.
 | **File analysis** | Magic-byte typing, hashes, dangerous-type and extension-mismatch detection, PDF links and active content (`/JavaScript`, `/OpenAction`, `/Launch`…), APK package, permissions and embedded URLs. |
 | **Threat intelligence** | VirusTotal, AbuseIPDB, URLhaus, Google Safe Browsing, Have I Been Pwned (key-based) and Shodan InternetDB and RDAP domain age (keyless). Concurrent, cached and rate-limited, with graceful degradation. |
 | **Risk engine** | 35 deterministic rules → 0–100 score, severity, confidence, primary classification, ranked threat categories, MITRE ATT&CK techniques and CWE references, with a full audit trail. |
-| **AI analyst** | Claude writes an executive summary, key findings and recommended actions when `ANTHROPIC_API_KEY` is set; otherwise a deterministic template does. |
+| **AI analyst** | Claude (when `ANTHROPIC_API_KEY` is set) or Gemini (when `GEMINI_API_KEY` is set) writes an executive summary, key findings and recommended actions; otherwise a deterministic template does. The model only explains the verdict and never changes it. |
 | **Reports** | PDF and Markdown (indicators defanged), STIX 2.1 bundles (observables, indicators, attack-patterns, relationships, report) and raw JSON. |
 | **History** | Every investigation is stored (SQLite by default, PostgreSQL supported) with search, severity filters and dashboard statistics. |
 | **Security** | Optional API-key authentication, per-client rate limiting, security headers, upload size limits and zip-bomb guards. |
@@ -116,6 +116,7 @@ All settings are environment variables (or `backend/.env`). See `backend/.env.ex
 | `INTEL_TIMEOUT_SECONDS` / `INTEL_CONCURRENCY` / `INTEL_MAX_ARTIFACTS_PER_CATEGORY` | `8` / `8` / `25` | Lookup tuning. |
 | `ANTHROPIC_API_KEY` | empty | Enables the Claude-written analyst report. |
 | `ANALYST_ENABLED` / `ANALYST_MODEL` / `ANALYST_EFFORT` | `true` / `claude-opus-5-5` / `medium` | Analyst behaviour. |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | empty / `gemini-3.7-flash` | Gemini-written analyst report, used when `ANTHROPIC_API_KEY` is not set. Free keys: https://aistudio.google.com/apikey. |
 | `DATABASE_URL` | `sqlite:///./reconiq.db` | e.g. `postgresql+psycopg://user:pass@host/db`. |
 | `PERSIST_INVESTIGATIONS` | `true` | Save investigations to history. |
 | `API_KEYS` | empty | Comma-separated keys; when set, every endpoint except health requires `X-API-Key` or `Authorization: Bearer`. |

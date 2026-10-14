@@ -121,7 +121,7 @@ export interface AnalystReport {
   summary: string;
   key_findings: string[];
   recommended_actions: string[];
-  generated_by: "claude" | "template";
+  generated_by: "claude" | "gemini" | "template";
   model: string | null;
   note: string | null;
   disclaimer: string;
@@ -300,7 +300,7 @@ export interface Capabilities {
   auth_enabled: boolean;
   rate_limit_per_minute: number;
   persistence: boolean;
-  analyst: { mode: "claude" | "template"; model: string | null };
+  analyst: { mode: "claude" | "gemini" | "template"; model: string | null };
   ingestion: { max_upload_mb: number; qr_decoding: boolean; ocr: boolean; file_types: string[] };
   threat_intel: ProviderStatus[];
   rules: { id: string; name: string; severity: Severity; weight: number; enabled: boolean }[];

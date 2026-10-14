@@ -13,7 +13,7 @@ os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "sqlite://")
 os.environ["RATE_LIMIT_PER_MINUTE"] = "0"
 os.environ["API_KEYS"] = ""
 for _key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "URLHAUS_AUTH_KEY", "GOOGLE_SAFE_BROWSING_API_KEY",
-             "HIBP_API_KEY", "ANTHROPIC_API_KEY"):
+             "HIBP_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"):
     os.environ[_key] = ""
 
 import pytest

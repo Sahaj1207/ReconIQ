@@ -2,16 +2,17 @@ import { Bot, FileText, Info } from "lucide-react";
 import type { AnalystReport } from "../lib/types";
 
 export function AnalystCard({ report }: { report: AnalystReport }) {
-  const byClaude = report.generated_by === "claude";
+  const byModel = report.generated_by !== "template";
+  const provider = report.generated_by === "gemini" ? "Gemini" : "Claude";
   return (
     <section className="card">
       <div className="card-header">
         <h2 className="card-title">
-          {byClaude ? <Bot className="h-4 w-4 text-accent" /> : <FileText className="h-4 w-4 text-accent" />}
+          {byModel ? <Bot className="h-4 w-4 text-accent" /> : <FileText className="h-4 w-4 text-accent" />}
           Analyst summary
         </h2>
         <span className="chip bg-surface-2 text-ink-muted" title={report.model ?? undefined}>
-          {byClaude ? `Written by ${report.model ?? "Claude"}` : "Deterministic template"}
+          {byModel ? `Written by ${report.model ?? provider}` : "Deterministic template"}
         </span>
       </div>
       <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">

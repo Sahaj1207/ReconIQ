@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     ANALYST_MODEL: str = "claude-opus-5-5"
     ANALYST_EFFORT: str = "medium"
     ANALYST_TIMEOUT_SECONDS: float = 60.0
+    # Gemini alternative, used when GEMINI_API_KEY is set and ANTHROPIC_API_KEY is not
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.7-flash"
 
     # CORS Configuration
     CORS_ORIGINS: List[str] = [

@@ -102,7 +102,14 @@ function ApiAccess({ authEnabled, error, onSaved }: { authEnabled?: boolean; err
 function Overview({ caps }: { caps: Capabilities }) {
   const rows: [string, React.ReactNode][] = [
     ["Version", `v${caps.version} · ${caps.environment}`],
-    ["AI analyst", caps.analyst.mode === "claude" ? `Claude (${caps.analyst.model})` : "Deterministic template — set ANTHROPIC_API_KEY to enable Claude"],
+    [
+      "AI analyst",
+      caps.analyst.mode === "claude"
+        ? `Claude (${caps.analyst.model})`
+        : caps.analyst.mode === "gemini"
+          ? `Gemini (${caps.analyst.model})`
+          : "Deterministic template — set ANTHROPIC_API_KEY or GEMINI_API_KEY to enable an AI write-up",
+    ],
     ["History", caps.persistence ? "Investigations are saved" : "Persistence disabled"],
     ["Rate limit", caps.rate_limit_per_minute ? `${caps.rate_limit_per_minute} requests / minute / client` : "Disabled"],
     ["Uploads", `Up to ${caps.ingestion.max_upload_mb} MB`],
