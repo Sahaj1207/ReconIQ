@@ -28,7 +28,11 @@ async def lifespan(app: FastAPI):
     Application startup and shutdown lifespan context.
     """
     logger.info(f"Starting {settings.APP_NAME} v{__version__} in [{settings.ENVIRONMENT}] environment.")
-    init_db()
+    try:
+        init_db()
+    except Exception:
+        # Keep serving: health reports the problem and database routes retry on each request.
+        logger.exception("Database initialisation failed at startup")
     logger.info("Deterministic Threat Investigation Engine initialized.")
     yield
     logger.info("Shutting down ReconIQ backend services.")

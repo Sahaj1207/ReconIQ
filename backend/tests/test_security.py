@@ -60,3 +60,23 @@ async def test_rate_limited_response_keeps_cors_headers(async_client, monkeypatc
     limited = await async_client.get("/api/v1/investigations", headers=headers)
     assert limited.status_code == 429
     assert limited.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+@pytest.mark.asyncio
+async def test_health_reports_database_failure_without_going_down(async_client, monkeypatch):
+    from app.api.v1.endpoints import health
+    from app.db import database
+
+    def broken():
+        raise RuntimeError("boom")
+    monkeypatch.setattr(health, "init_db", broken)
+    monkeypatch.setattr(database, "_db_error", "OperationalError: connection to server failed")
+    body = (await async_client.get("/api/v1/health")).json()
+    assert body["status"] == "degraded" and body["database"] == "unavailable"
+    assert body["database_error"].startswith("OperationalError")
+
+
+def test_database_errors_never_include_credentials():
+    from app.db.database import describe_error
+    msg = describe_error(RuntimeError('cannot connect to postgresql://user:hunter2@db.example.com:6543/postgres password=hunter2'))
+    assert "hunter2" not in msg and msg.startswith("RuntimeError: cannot connect")
