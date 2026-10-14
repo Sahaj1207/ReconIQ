@@ -1,12 +1,10 @@
 import { AlertOctagon, Info } from "lucide-react";
 import type { InvestigationResult } from "../lib/types";
 
-/** Pipeline errors/warnings plus a hint when intel providers are not configured. */
-export function Notices({ result }: { result: InvestigationResult }) {
-  const intel = Object.values(result.threat_intelligence).flat();
-  const missingKey = intel.some((i) => i?.error_message?.toLowerCase().includes("api key"));
-
-  if (!result.errors.length && !result.warnings.length && !missingKey) return null;
+/** Pipeline errors/warnings plus a hint when no threat-intel provider is configured. */
+export function Notices({ result, intelConfigured }: { result: InvestigationResult; intelConfigured?: boolean }) {
+  const showIntelHint = intelConfigured === false;
+  if (!result.errors.length && !result.warnings.length && !showIntelHint) return null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -16,10 +14,10 @@ export function Notices({ result }: { result: InvestigationResult }) {
       {result.warnings.map((w) => (
         <Notice key={w} tone="warn" text={w} />
       ))}
-      {missingKey && (
+      {showIntelHint && (
         <Notice
           tone="info"
-          text="Threat intelligence lookups were skipped because no provider API key is configured. Set VIRUSTOTAL_API_KEY in backend/.env to enable enrichment."
+          text="No threat-intelligence provider is enabled, so indicators were scored on their own characteristics only. Add a provider key (e.g. VIRUSTOTAL_API_KEY) in backend/.env — see System for the full list."
         />
       )}
     </div>

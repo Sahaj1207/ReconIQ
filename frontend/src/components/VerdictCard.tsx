@@ -1,6 +1,7 @@
-import { Clock, Download, Fingerprint, Gauge, Layers } from "lucide-react";
+import { Clock, FileInput, Gauge, Layers } from "lucide-react";
 import type { InvestigationResult } from "../lib/types";
-import { formatMs, formatPercent, severityStyle } from "../lib/format";
+import { SOURCE_LABELS, formatMs, formatPercent, severityStyle, titleCase } from "../lib/format";
+import { ExportMenu } from "./ExportMenu";
 import { SeverityBadge } from "./SeverityBadge";
 import { CopyButton } from "./CopyButton";
 
@@ -41,15 +42,7 @@ export function VerdictCard({ result }: { result: InvestigationResult }) {
   const triggered = risk?.applied_rules.filter((r) => r.matched).length ?? 0;
   const status = STATUS_TEXT[result.status];
 
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reconiq-${result.investigation_id.slice(0, 8)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const classification = risk?.classification ?? "no_threat_identified";
 
   return (
     <section className="card overflow-hidden">
@@ -70,7 +63,11 @@ export function VerdictCard({ result }: { result: InvestigationResult }) {
             <span className={`text-xs ${status.cls}`}>{status.label}</span>
           </div>
           <h2 className="mt-2 text-xl font-semibold tracking-tight">
-            {risk ? `${sev.label} risk assessment` : "No risk assessment produced"}
+            {!risk
+              ? "No risk assessment produced"
+              : classification === "no_threat_identified"
+                ? "No specific threat identified"
+                : titleCase(classification)}
           </h2>
           <p className="mt-1 text-sm text-ink-muted">
             {triggered} of {risk?.applied_rules.length ?? 0} deterministic rules matched across {totalIocs} extracted
@@ -81,7 +78,12 @@ export function VerdictCard({ result }: { result: InvestigationResult }) {
             <Stat icon={<Gauge className="h-3.5 w-3.5" />} label="Confidence" value={formatPercent(risk?.confidence ?? 0)} />
             <Stat icon={<Layers className="h-3.5 w-3.5" />} label="Indicators" value={String(totalIocs)} />
             <Stat icon={<Clock className="h-3.5 w-3.5" />} label="Duration" value={formatMs(result.duration_ms)} />
-            <Stat icon={<Fingerprint className="h-3.5 w-3.5" />} label="Pipeline" value={`v${result.pipeline_version}`} />
+            <Stat
+              icon={<FileInput className="h-3.5 w-3.5" />}
+              label="Source"
+              value={SOURCE_LABELS[result.source_type] ?? result.source_type}
+              title={result.source_name ?? undefined}
+            />
           </dl>
         </div>
       </div>
@@ -91,22 +93,20 @@ export function VerdictCard({ result }: { result: InvestigationResult }) {
           <span className="truncate">ID {result.investigation_id}</span>
           <CopyButton value={result.investigation_id} label="Copy investigation ID" />
         </div>
-        <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={exportJson}>
-          <Download className="h-3.5 w-3.5" /> Export JSON
-        </button>
+        <ExportMenu investigationId={result.investigation_id} />
       </div>
     </section>
   );
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function Stat({ icon, label, value, title }: { icon: React.ReactNode; label: string; value: string; title?: string }) {
   return (
-    <div className="rounded-lg border border-line bg-canvas/50 px-3 py-2">
+    <div className="rounded-lg border border-line bg-canvas/50 px-3 py-2" title={title}>
       <dt className="flex items-center gap-1.5 text-[11px] text-ink-faint">
         {icon}
         {label}
       </dt>
-      <dd className="mt-0.5 text-sm font-semibold tabular-nums">{value}</dd>
+      <dd className="mt-0.5 truncate text-sm font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }

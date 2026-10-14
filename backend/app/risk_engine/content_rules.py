@@ -440,7 +440,7 @@ class QRCodeURLRule(_Rule):
             "RULE_FIL_002", "QR Code Leading to URL",
             "An image contains a QR code that encodes a web link (quishing)",
             RiskWeights.MEDIUM, "MEDIUM",
-            categories=["qr_phishing", "phishing_email"], mitre=["T1566.002", "T1204.001"],
+            categories=["qr_phishing"], mitre=["T1566.002", "T1204.001"],
         )
 
     def evaluate(self, context: Dict[str, Any]) -> RuleResult:

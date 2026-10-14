@@ -38,8 +38,8 @@ Analyst contact: soc-oncall@example.org`,
   },
   {
     id: "benign",
-    label: "Benign note",
-    description: "Internal message with private addresses only",
+    label: "Internal note",
+    description: "Ordinary internal message — expect a low score",
     text: `Hi team, the staging server moved to 10.0.4.12 and the wiki is now at
 https://wiki.example.com/onboarding. Ping me at alex@example.com if anything breaks.`,
   },

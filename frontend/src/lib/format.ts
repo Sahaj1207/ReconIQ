@@ -7,9 +7,10 @@ export const CATEGORY_LABELS: Record<ArtifactCategory, string> = {
   ipv6: "IPv6",
   emails: "Emails",
   phone_numbers: "Phone numbers",
+  hashes: "File hashes",
 };
 
-export const CATEGORY_ORDER: ArtifactCategory[] = ["urls", "domains", "ipv4", "ipv6", "emails", "phone_numbers"];
+export const CATEGORY_ORDER: ArtifactCategory[] = ["urls", "domains", "ipv4", "ipv6", "emails", "hashes", "phone_numbers"];
 
 export const STAGE_LABELS: Record<string, string> = {
   evidence_collection: "Evidence collection",
@@ -17,6 +18,7 @@ export const STAGE_LABELS: Record<string, string> = {
   validation: "Validation",
   threat_intelligence: "Threat intelligence",
   risk_assessment: "Risk assessment",
+  ai_analyst: "AI analyst",
 };
 
 export const SEVERITY_ORDER: Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"];
@@ -69,3 +71,24 @@ export function humanizeKey(key: string): string {
 export function defang(value: string): string {
   return value.replace(/^http/i, "hxxp").replace(/\./g, "[.]").replace(/@/g, "[at]");
 }
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export function titleCase(slug: string): string {
+  return slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bQr\b/, "QR");
+}
+
+export const SOURCE_LABELS: Record<string, string> = {
+  raw_text: "Text",
+  email: "Email",
+  pdf_file: "PDF",
+  qr_code: "QR image",
+  image: "Image",
+  apk_file: "Android app",
+  browser_upload: "File",
+  ocr_text: "OCR",
+};

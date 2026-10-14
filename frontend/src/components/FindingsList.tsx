@@ -38,7 +38,14 @@ export function FindingsList({ findings }: { findings: RiskFinding[] }) {
                     <SeverityBadge severity={f.severity} />
                   </div>
                   <p className="mt-0.5 text-[13px] text-ink-muted">{f.description}</p>
-                  <div className="mt-1 font-mono text-[11px] text-ink-faint">{f.finding_id.replace(/_FINDING$/, "")}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-ink-faint">
+                    <span>{f.rule_id ?? f.finding_id.replace(/_FINDING$/, "")}</span>
+                    {f.mitre_techniques?.map((t) => (
+                      <a key={t.id} href={t.url} target="_blank" rel="noreferrer" title={t.name} className="text-accent/80 hover:text-accent">
+                        {t.id}
+                      </a>
+                    ))}
+                  </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <div className={`font-mono text-sm font-semibold tabular-nums ${f.score_impact > 0 ? s.text : "text-ink-faint"}`}>

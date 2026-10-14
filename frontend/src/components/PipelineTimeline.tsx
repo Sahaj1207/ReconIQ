@@ -2,7 +2,7 @@ import { CheckCircle2, CircleDashed, Workflow, XCircle } from "lucide-react";
 import type { StageMetric } from "../lib/types";
 import { STAGE_LABELS, formatMs } from "../lib/format";
 
-const DEFAULT_STAGES = ["evidence_collection", "normalization", "validation", "threat_intelligence", "risk_assessment"];
+const DEFAULT_STAGES = ["evidence_collection", "normalization", "validation", "threat_intelligence", "risk_assessment", "ai_analyst"];
 
 export function PipelineTimeline({ metrics, loading }: { metrics?: StageMetric[]; loading?: boolean }) {
   const byName = new Map(metrics?.map((m) => [m.stage_name, m]));
@@ -17,7 +17,7 @@ export function PipelineTimeline({ metrics, loading }: { metrics?: StageMetric[]
           Pipeline execution
         </h2>
       </div>
-      <ol className="grid grid-cols-1 gap-px overflow-hidden rounded-b-xl bg-line sm:grid-cols-5">
+      <ol className="grid grid-cols-1 gap-px overflow-hidden rounded-b-xl bg-line sm:grid-cols-3 xl:grid-cols-6">
         {stages.map((name, i) => {
           const m = byName.get(name);
           const failed = m?.status === "FAILED";
