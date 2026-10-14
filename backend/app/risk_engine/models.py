@@ -26,6 +26,10 @@ class RiskFinding(BaseModel):
     severity: str = Field(..., description="Severity classification (INFORMATIONAL, LOW, MEDIUM, HIGH, CRITICAL)")
     score_impact: float = Field(..., description="Numeric score contribution of this finding")
     artifact: Optional[str] = Field(default=None, description="Specific artifact string associated with the finding")
+    rule_id: Optional[str] = Field(default=None, description="ID of the rule that produced the finding")
+    categories: List[str] = Field(default_factory=list, description="Threat taxonomy categories evidenced by the finding")
+    mitre_techniques: List[Dict[str, str]] = Field(default_factory=list, description="MITRE ATT&CK technique references")
+    cwes: List[Dict[str, str]] = Field(default_factory=list, description="CWE weakness references")
 
 
 class AppliedRule(BaseModel):
@@ -65,6 +69,9 @@ class RiskAssessment(BaseModel):
     findings: List[RiskFinding] = Field(default_factory=list, description="Categorized risk findings")
     applied_rules: List[AppliedRule] = Field(default_factory=list, description="Log of all evaluated rules")
     artifact_breakdown: Dict[str, int] = Field(default_factory=dict, description="Artifact count breakdown")
+    classification: str = Field(default="unknown", description="Primary threat category (highest weighted)")
+    threat_categories: List[str] = Field(default_factory=list, description="All evidenced threat categories, ranked")
+    mitre_techniques: List[Dict[str, str]] = Field(default_factory=list, description="Aggregated MITRE ATT&CK techniques")
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
         description="ISO 8601 UTC timestamp of assessment completion"

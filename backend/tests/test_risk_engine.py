@@ -64,14 +64,15 @@ def test_confidence_engine_calculation():
 def test_rule_enable_disable():
     """Test rule registry enable/disable flags."""
     registry = RuleRegistry()
+    total = len(registry.get_all_rules())
 
-    assert len(registry.get_enabled_rules()) == 9
+    assert len(registry.get_enabled_rules()) == total
 
     registry.disable_rule("RULE_VAL_001")
-    assert len(registry.get_enabled_rules()) == 8
+    assert len(registry.get_enabled_rules()) == total - 1
 
     registry.enable_rule("RULE_VAL_001")
-    assert len(registry.get_enabled_rules()) == 9
+    assert len(registry.get_enabled_rules()) == total
 
 
 def test_empty_evidence_assessment():
@@ -165,6 +166,7 @@ def test_mixed_evidence_scenarios():
 def test_rule_failure_isolation():
     """Test that a crashing rule does not halt RiskScorer assessment."""
     registry = RuleRegistry()
+    baseline = len(registry.get_all_rules())
     registry.register_rule(CrashingTestRule())
 
     scorer = RiskScorer(registry=registry)
@@ -173,4 +175,17 @@ def test_rule_failure_isolation():
     # Assessment should complete safely
     assessment = scorer.assess(evidence=evidence)
     assert assessment.total_score >= 0.0
-    assert len(assessment.applied_rules) == 10
+    assert len(assessment.applied_rules) == baseline + 1
+
+
+def test_clean_high_confidence_intel_is_not_flagged():
+    """A clean verdict (high confidence, no indicators) from two providers must not score as malicious."""
+    clean = [
+        ThreatIntelResponse(provider=p, artifact="example.com", artifact_type="domain",
+                            status=LookupStatus.SUCCESS, confidence=0.8)
+        for p in ("VirusTotal", "OtherIntel")
+    ]
+    assessment = RiskScorer().assess(evidence={"domains": ["example.com"]}, intel_results={"domains": clean})
+    matched = {r.rule_id for r in assessment.applied_rules if r.matched}
+    assert "RULE_INT_001" not in matched
+    assert "RULE_INT_002" not in matched

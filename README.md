@@ -1,182 +1,239 @@
 # ReconIQ
 
-### Enterprise Cybersecurity Investigation Platform
+### Cybersecurity Investigation Platform
 
 **Evidence. Intelligence. Trust.**
 
-> **Tagline**: *Evidence. Intelligence. Trust.*
+ReconIQ investigates suspicious content — pasted text, emails, PDFs, screenshots and QR codes, Android apps or any
+binary — and produces an explainable risk assessment. A **deterministic-first pipeline** extracts and validates
+indicators, enriches them with threat intelligence, and scores them with a transparent rule engine mapped to MITRE
+ATT&CK. Each result ends with a plain-language summary, key findings and recommended actions.
 
-**ReconIQ** is an enterprise-grade cybersecurity threat analysis platform built with FastAPI, Python, and a modular architecture. ReconIQ operates on a **deterministic-first investigation pipeline** where evidence collection, normalization, threat intelligence enrichment, and rule-based risk engines strictly govern security assessments before AI report generation.
-
----
-
-## 🛡️ Core Architectural Principle
-
-> **AI is NEVER responsible for deciding whether an artifact or input is malicious.**
-
-Threat detection, risk scoring, and evidence validation are strictly driven by deterministic rule engines, MITRE ATT&CK taxonomies, and verified intelligence integrations. The AI Analyst functions exclusively to explain aggregated evidence and compile human-readable investigation summaries.
+> **Core principle — every verdict is explainable.**
+> Scores, severities and classifications come only from fixed, auditable rules, and every point of the score traces
+> back to a named rule in the audit trail. No machine-learning model or AI is involved in any decision.
 
 ---
 
-## ⚙️ Investigation Pipeline Architecture
+## Features
+
+| Area | What ReconIQ does |
+|---|---|
+| **Ingestion** | Text (defanged notation supported), `.eml` and Outlook `.msg` emails, PDFs (including QR codes and OCR text in embedded images), Office documents (VBA macro detection for `.docm`/`.xlsm`/`.doc`/`.xls`, remote-template links), ZIP archives (recursive, with depth, entry-count, size and decompression-bomb limits), images (QR decoding, optional OCR), Android APKs, text/log files, and any binary (fingerprint + hash lookup). |
+| **Indicators** | IPv4/IPv6, URLs (including IP-literal hosts), domains, emails, phone numbers and MD5/SHA-1/SHA-256 hashes — refanged, normalized and validated (RFC checks, TLDs, private/reserved ranges). |
+| **Email analysis** | SPF/DKIM/DMARC verdicts, display name, reply-to and return-path routing, relay IPs, HTML link targets, attachment fingerprints. |
+| **File analysis** | Magic-byte typing, hashes, dangerous-type and extension-mismatch detection, PDF links and active content (`/JavaScript`, `/OpenAction`, `/Launch`…), APK package, permissions and embedded URLs. |
+| **Threat intelligence** | VirusTotal, AbuseIPDB, URLhaus, Google Safe Browsing, Have I Been Pwned (key-based) and Shodan InternetDB and RDAP domain age (keyless). Concurrent, cached and rate-limited, with graceful degradation. A VirusTotal detection counts as malicious only when at least 3 engines agree; isolated detections are reported as weak signals. |
+| **Risk engine** | 36 deterministic rules → 0–100 score, severity, confidence, primary classification, ranked threat categories, MITRE ATT&CK techniques and CWE references, with a full audit trail. |
+| **Analyst summary** | A deterministic executive summary, key findings and recommended actions generated from the scored evidence. |
+| **Reports** | PDF and Markdown (indicators defanged), STIX 2.1 bundles (observables, indicators, attack-patterns, relationships, report) and raw JSON. |
+| **History** | Every investigation is stored (SQLite by default, PostgreSQL supported) with search, severity filters and dashboard statistics. |
+| **Security** | Optional API-key authentication, per-client rate limiting, security headers, upload size limits and zip-bomb guards. |
+| **Dashboard** | React analyst UI: investigate text or files, inspect findings, ATT&CK mapping, email/file analysis and indicators, export reports, browse history, view system status. |
+
+---
+
+## Investigation pipeline
 
 ```
-User Input ──► Ingestion ──► Evidence Collector ──► Normalization ──► Validators
-                                                                          │
-                                                                          ▼
-Report Generator ◄── AI Analyst ◄── Risk Engine ◄── Threat Intel ◄── Pipeline
+Input ─► Ingestion ─► Evidence collection ─► Normalization ─► Validation ─► Threat intel ─► Risk engine ─► Summary
+(text,   (parsers:     (IOC extractor +       (refang,          (RFC/TLD/     (7 providers,   (36 rules,     (explains;
+ files)   eml, pdf,     seeded file hashes)    canonicalize)     scope checks)  concurrent)     ATT&CK, CWE)   never scores)
+          qr, apk)
+                                                                                                 │
+                                                       History (SQL) ◄── Reports (PDF · Markdown · STIX 2.1 · JSON)
 ```
 
-### Pipeline Stage Breakdown
-
-1. **User Input**: Ingests raw text, email content, file uploads, URLs, or browser data.
-2. **Ingestion (`app/ingestion/`)**: Multi-source entry layer handling artifact ingestion (text, QR, OCR, PDF, APK, headers).
-3. **Evidence Collector (`app/ingestion/extractors/`)**: Extracts granular technical indicators (IOC Extractor for IPv4, IPv6, URLs, Domains, Email addresses, Phone numbers).
-4. **Normalization (`app/utils/normalizer.py`)**: Standardizes extracted elements (refanging `hxxp` ➔ `http`, `[.]` ➔ `.`, `[at]` ➔ `@`).
-5. **Validators**: Performs RFC IP checks, TLD verification, syntax validation, and private address filtering.
-6. **Pipeline (`app/pipeline/`)**: Central orchestrator managing investigation state transitions and context accumulation.
-7. **Threat Intelligence Integrations (`app/integrations/`)**: Asynchronous lookup clients for external threat intel providers (VirusTotal, AbuseIPDB, Shodan, WHOIS, PhishTank, HIBP, etc.).
-8. **Risk Engine (`app/risk_engine/`)**: Deterministic decision-making engine calculating evidence-based risk scores (0-100), rule matches, and confidence metrics.
-9. **AI Analyst**: Summarizes findings and provides natural language context exclusively based on accumulated evidence.
-10. **Report Generator**: Produces final structured JSON, STIX 2.1 threat objects, or executive PDF reports.
+Each stage runs inside an isolation boundary: a failing stage is recorded (with secrets sanitized) and the
+investigation continues as `partial_success`.
 
 ---
 
-## 📁 Repository Folder Structure
+## Quick start
+
+### Docker (full stack)
+
+```bash
+cp backend/.env.example backend/.env   # add any provider keys you have
+docker compose up --build
+```
+
+- Dashboard: <http://localhost:8080>
+- API docs (Swagger): <http://localhost:8000/docs>
+
+Compose runs PostgreSQL, the API (with Tesseract for OCR) and the nginx-served dashboard.
+
+### Local development
+
+**Backend** (Python 3.10+):
+
+```bash
+cd backend
+python -m venv venv && source venv/bin/activate      # Windows: .\venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
+
+**Frontend** (Node.js 18+), in a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173, proxies /api to :8000 (override with VITE_API_PROXY)
+```
+
+For a production frontend build pointed at a remote API, set `VITE_API_BASE_URL` and run `npm run build`.
+
+OCR needs the `tesseract-ocr` system package (installed in the Docker image). Without it, images are still decoded for QR
+codes and fingerprinted.
+
+### Tests
+
+```bash
+cd backend && python -m pytest -q      # 162 tests, fully offline (HTTP providers are mocked)
+cd frontend && npm test                # Vitest + Testing Library component tests (jsdom)
+cd frontend && npm run build           # type-check + production build
+```
+
+`backend/tests/test_accuracy.py` scores a labelled set of 35 benign and malicious samples
+(`backend/tests/samples/labeled_samples.json` plus generated Office, ZIP, `.msg` and PDF files) and fails if
+accuracy drops below 95%, precision below 95% or recall below 90%. A sample counts as flagged at MEDIUM (score ≥ 40).
+Run it with `-s` to print the per-sample table. It is a small hand-made regression set, not a benchmark.
+
+CI (`.github/workflows/ci.yml`) runs all of these, then builds the Docker images.
+
+---
+
+## Configuration
+
+All settings are environment variables (or `backend/.env`). See `backend/.env.example`.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, `URLHAUS_AUTH_KEY`, `GOOGLE_SAFE_BROWSING_API_KEY`, `HIBP_API_KEY` | empty | Each provider is enabled when its key is set. |
+| `INTEL_KEYLESS_PROVIDERS` | `true` | Enable Shodan InternetDB and RDAP (outbound calls, no key). |
+| `INTEL_TIMEOUT_SECONDS` / `INTEL_CONCURRENCY` / `INTEL_MAX_ARTIFACTS_PER_CATEGORY` | `8` / `8` / `25` | Lookup tuning. |
+| `DATABASE_URL` | `sqlite:///./reconiq.db` | e.g. `postgresql+psycopg://user:pass@host/db`. |
+| `PERSIST_INVESTIGATIONS` | `true` | Save investigations to history. |
+| `API_KEYS` | empty | Comma-separated keys; when set, every endpoint except health requires `X-API-Key` or `Authorization: Bearer`. |
+| `RATE_LIMIT_PER_MINUTE` | `60` | Per-client limit on API routes (`0` disables). In-process; use a shared store with multiple replicas. |
+| `MAX_UPLOAD_MB` | `15` | Upload size cap. |
+| `CORS_ORIGINS` | localhost dev ports | Allowed browser origins. |
+
+---
+
+## API
+
+| Method & path | Description |
+|---|---|
+| `GET /api/v1/health` | Liveness and version (always public). |
+| `POST /api/v1/evidence/investigate` | Investigate text: `{"text": "...", "refang": true}`. |
+| `POST /api/v1/evidence/investigate/file` | Investigate an upload (multipart `file`, optional `refang`). |
+| `POST /api/v1/evidence/jobs` | Start a background investigation (same body); returns `202` with a `job_id`. The UI uses this. |
+| `POST /api/v1/evidence/jobs/file` | Start a background file investigation. Parse errors and size limits fail immediately. |
+| `GET /api/v1/jobs/{job_id}` | Poll a job: `status` (`queued`, `running`, `succeeded`, `failed`), `progress`, per-stage `stages` and, when done, `investigation_id`. Visible to its owner and admins. |
+| `POST /api/v1/evidence/extract` | Extract indicators only, no scoring. |
+| `GET /api/v1/investigations` | History: `limit`, `offset`, `severity`, `q` (search). |
+| `GET /api/v1/investigations/stats` | Totals, last 7 days, average score, severity and classification breakdowns. |
+| `GET /api/v1/investigations/{id}` | Full stored result. |
+| `DELETE /api/v1/investigations/{id}` | Delete an investigation. |
+| `GET /api/v1/investigations/{id}/report?format=pdf\|markdown\|stix\|json` | Export a report. |
+| `GET /api/v1/system/capabilities` | Providers, analyst mode, ingestion features, limits and the rule catalogue. |
+
+Example:
+
+```bash
+curl -s localhost:8000/api/v1/evidence/investigate \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "URGENT: verify your password at hxxps://paypal-account-security[.]xyz/signin"}' | jq .risk_assessment.classification
+# "credential_harvesting"
+
+curl -s -F file=@suspicious.eml localhost:8000/api/v1/evidence/investigate/file | jq .risk_assessment.total_score
+```
+
+The response includes evidence, normalized evidence, validation results, intel responses, the risk assessment (findings
+with ATT&CK/CWE context, applied rules, classification), the analyst report, ingestion analysis and per-stage timings.
+
+---
+
+## Detection rules
+
+Scores are the capped sum of matched rule weights. Severity bands: 0–19 Informational, 20–39 Low, 40–59 Medium, 60–79 High, 80–100 Critical.
+
+| Rule | Name | Severity | Weight |
+|---|---|---|---|
+| RULE_VAL_001 | Invalid URL Detected | MEDIUM | 25 |
+| RULE_VAL_002 | Invalid Domain or IP Masquerade | HIGH | 50 |
+| RULE_VAL_003 | Invalid Email Structure | LOW | 10 |
+| RULE_INT_001 | Threat Intel Provider Flagged Malicious | HIGH | 50 |
+| RULE_INT_002 | Multi-Provider Threat Consensus | CRITICAL | 80 |
+| RULE_INT_003 | Threat Intel Provider Failure | INFORMATIONAL | 0 |
+| RULE_INT_004 | Newly Registered Domain (< 30 days) | HIGH | 50 |
+| RULE_INT_005 | Weak Provider Detection (e.g. 1–2 VirusTotal engines) | LOW | 10 |
+| RULE_EVI_001 | Defanged Indicator Obfuscation Detected | MEDIUM | 25 |
+| RULE_EVI_002 | High Artifact Density (≥ 8) | MEDIUM | 25 |
+| RULE_EVI_003 | Public IP Address Present | LOW | 10 |
+| RULE_EVI_004 | Brand Impersonation Domain | HIGH | 50 |
+| RULE_EVI_005 | Deceptive Keyword Domain | MEDIUM | 25 |
+| RULE_EVI_006 | Punycode / Homograph Domain | MEDIUM | 25 |
+| RULE_EVI_007 | High-Abuse Top-Level Domain | LOW | 10 |
+| RULE_EVI_008 | URL Shortener Concealment | LOW | 10 |
+| RULE_EVI_009 | IP-Literal URL | MEDIUM | 25 |
+| RULE_EVI_010 | Non-Standard Port | LOW | 10 |
+| RULE_EVI_011 | Executable Payload Download | HIGH | 50 |
+| RULE_CNT_001 | Credential Phishing Language | MEDIUM | 25 |
+| RULE_CNT_002 | Financial or Tech-Support Scam Language | MEDIUM | 25 |
+| RULE_CNT_003 | Gift Card or Payment Diversion Request | HIGH | 50 |
+| RULE_CNT_004 | Tech-Support Scam With Call-Back Number | HIGH | 50 |
+| RULE_CNT_005 | Credential Lure Behind an Obscured Link | MEDIUM | 25 |
+| RULE_EML_001 | Email Authentication Failure | HIGH | 50 |
+| RULE_EML_002 | Reply-To / Return-Path Mismatch | MEDIUM | 25 |
+| RULE_EML_003 | Display Name Spoofing | MEDIUM | 25 |
+| RULE_EML_004 | Deceptive Link Text | HIGH | 50 |
+| RULE_FIL_001 | Dangerous File or Attachment | HIGH | 50 |
+| RULE_FIL_002 | QR Code Leading to URL | MEDIUM | 25 |
+| RULE_FIL_003 | Android App With Dangerous Permissions | HIGH | 50 |
+| RULE_FIL_004 | PDF Active Content | HIGH | 50 |
+| RULE_FIL_005 | Office Document Contains VBA Macros | MEDIUM | 25 |
+| RULE_FIL_006 | Auto-Executing Macro With Suspicious Calls | CRITICAL | 80 |
+| RULE_FIL_007 | Archive Conceals Risky Content | HIGH | 50 |
+| RULE_FIL_008 | QR Code Link Inside PDF | MEDIUM | 25 |
+
+A provider result counts as a malicious verdict only when the lookup succeeded **and** returned a MEDIUM-or-higher
+threat indicator; provider confidence alone never flags an artifact.
+
+---
+
+## Repository layout
 
 ```
 backend/
-├── app/
-│   ├── __init__.py                     # Package metadata
-│   ├── main.py                         # FastAPI application entrypoint
-│   ├── api/                            # API endpoints & presentation layer
-│   │   └── v1/
-│   │       ├── router.py              # Central API v1 router
-│   │       └── endpoints/
-│   │           ├── evidence.py        # Evidence extraction API (/api/v1/evidence/extract)
-│   │           └── health.py          # System telemetry & health check (/api/v1/health)
-│   ├── core/                           # Configuration & logging infrastructure
-│   │   ├── config.py                  # Pydantic BaseSettings management
-│   │   └── logging.py                 # Structured security audit logging
-│   ├── ingestion/                      # Multi-source ingestion & evidence extraction
-│   │   ├── ingested_input.py          # IngestedInput data model
-│   │   ├── collector.py               # EvidenceCollector primary facade
-│   │   └── extractors/
-│   │       ├── base.py                # Abstract Base Extractor interface
-│   │       └── ioc_extractor.py       # Production IOC Extractor component
-│   ├── pipeline/                       # Workflow & Investigation state manager [Placeholder]
-│   │   ├── investigation.py           # Investigation pipeline controller
-│   │   ├── context.py                 # InvestigationContext state holder
-│   │   └── steps.py                   # Modular pipeline step definitions
-│   ├── risk_engine/                    # Deterministic risk scoring engine [Placeholder]
-│   │   ├── scorer.py                  # Risk scoring calculator facade
-│   │   ├── rules.py                   # Threat detection rule declarations
-│   │   ├── weights.py                 # Severity weight definitions
-│   │   └── confidence.py              # Evidence-based confidence calculator
-│   ├── knowledge/                      # Cybersecurity taxonomies & frameworks [Placeholder]
-│   │   ├── severity.py                # Platform severity enums
-│   │   ├── taxonomy.py                # Threat classification taxonomy
-│   │   ├── mitre_attack.py            # MITRE ATT&CK matrix mappings
-│   │   └── cwe.py                     # CWE weakness mappings
-│   ├── integrations/                   # Threat intelligence integrations [Placeholder]
-│   │   └── base.py                    # Base async Threat Intel provider interface
-│   ├── services/                       # Application services layer
-│   │   └── investigation_service.py     # Investigation orchestrator
-│   ├── schemas/                        # Pydantic v2 DTOs
-│   │   ├── evidence.py                # Evidence request & response schemas
-│   │   ├── ioc.py                     # Categorized IOC data schemas
-│   │   └── health.py                  # Health check schema
-│   └── utils/                          # Utilities & normalizers
-│       ├── normalizer.py              # Defang refanging & string normalizers
-│       └── regex_patterns.py          # RFC-compliant regular expressions
-├── tests/                              # Pytest suite
-│   ├── conftest.py
-│   └── test_ioc_extractor.py          # IOC extraction & defang unit tests
-├── .env.example                        # Environment template
-├── pyproject.toml                      # Package config
-├── requirements.txt                    # Production & dev dependencies
-└── README.md                           # Platform documentation
+  app/
+    api/v1/endpoints/   evidence, investigations (history + reports), system, health
+    analyst/            deterministic analyst summary
+    core/               settings, logging, security (auth, rate limiting, headers)
+    db/                 SQLAlchemy models, session, repository
+    ingestion/          IOC extractor, collector, parsers (email, pdf, image, apk, file_info)
+    integrations/       provider base, HTTP base, manager, registry, providers/*
+    knowledge/          MITRE ATT&CK, CWE, threat taxonomy, severity
+    pipeline/           orchestrator, context, steps
+    reports/            STIX 2.1, Markdown, PDF
+    risk_engine/        rules, extended content rules, scorer, confidence, weights
+    utils/, validators/ normalizer, regex patterns, validator
+  tests/                117 offline tests
+frontend/
+  src/pages/            Investigate, History, Investigation, System
+  src/components/       result panels, input, export menu, …
+docker-compose.yml      Postgres + API + dashboard
+.github/workflows/      CI
 ```
 
 ---
 
-## 🚀 Running the Application
+## Known limitations
 
-### 1. Prerequisites
-- Python 3.10+
-- `pip` or virtual environment manager
-
-### 2. Installation
-```bash
-cd backend
-python -m venv venv
-# On Windows PowerShell:
-.\venv\Scripts\Activate.ps1
-# On Linux/macOS:
-source venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-### 3. Start Development Server
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-- Interactive Swagger API Docs: `http://localhost:8000/docs`
-- ReDoc API Documentation: `http://localhost:8000/redoc`
-
-### 4. Run Automated Tests
-```bash
-pytest
-```
-
----
-
-## 🔍 API Usage Example
-
-### Extract Indicators of Compromise (IOCs)
-**Endpoint**: `POST /api/v1/evidence/extract`
-
-**Request Body**:
-```json
-{
-  "text": "Alert: Phishing email from support[at]secure-bank[dot]com containing link hxxps://malicious-domain[.]com/login and IP 192.168.1.1 or 2001:db8::1. Call +1-800-555-0199."
-}
-```
-
-**Response Body**:
-```json
-{
-  "status": "success",
-  "execution_time_ms": 2.45,
-  "summary": {
-    "total_iocs": 5,
-    "ipv4_count": 1,
-    "ipv6_count": 1,
-    "url_count": 1,
-    "domain_count": 1,
-    "email_count": 1,
-    "phone_count": 1
-  },
-  "results": {
-    "ipv4": ["192.168.1.1"],
-    "ipv6": ["2001:db8::1"],
-    "urls": ["https://malicious-domain.com/login"],
-    "domains": ["secure-bank.com", "malicious-domain.com"],
-    "emails": ["support@secure-bank.com"],
-    "phone_numbers": ["+18005550199"]
-  }
-}
-```
-
----
-
-## 📌 Roadmap & Future Integrations
-
-- [ ] **Ingestion Layer**: OCR, QR Code decoding, raw email `.eml`/`.msg` header parser, PDF & file metadata extractors.
-- [ ] **Threat Intel Integrations**: VirusTotal, AbuseIPDB, Shodan, WHOIS, Google Safe Browsing, PhishTank, HIBP.
-- [ ] **Risk Engine**: Rule matching engine, dynamic weight assignment, confidence score aggregation.
-- [ ] **Knowledge Base**: Full MITRE ATT&CK (v14) matrix mappings, CWE lookup, standardized threat taxonomy.
-- [ ] **AI Analyst**: Contextual LLM summary generation based strictly on verified evidence.
-- [ ] **Database & Multi-tenancy**: PostgreSQL/SQLModel persistence layer for investigation history.
-- [ ] **React Frontend**: Next.js/Vite enterprise threat analyst dashboard.
+- Outlook `.msg` bodies stored only as compressed RTF aren't decoded (plain-text and HTML bodies are), and embedded message attachments aren't opened.
+- Only ZIP archives are opened; 7z and RAR are fingerprinted only, and password-protected entries are flagged, never decrypted.
+- Rate limiting and provider caches are in-process; multi-replica deployments should move them to a shared store.
+- Accounts are single-tenant: every signed-in user can see every investigation (deletion is limited to owners and admins).

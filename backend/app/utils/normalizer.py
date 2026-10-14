@@ -436,6 +436,15 @@ class Normalizer:
             else:
                 skipped_count += 1
 
+        # 7. Normalize File Hashes (lowercase hex)
+        normalized_hashes: Set[str] = set()
+        for raw in evidence.get("hashes", []):
+            norm = str(raw).strip().lower()
+            if re.fullmatch(r"[a-f0-9]{32}|[a-f0-9]{40}|[a-f0-9]{64}", norm):
+                normalized_hashes.add(norm)
+            else:
+                skipped_count += 1
+
         result = {
             "ipv4": sorted(list(normalized_ipv4)),
             "ipv6": sorted(list(normalized_ipv6)),
@@ -443,6 +452,7 @@ class Normalizer:
             "domains": sorted(list(normalized_domains)),
             "emails": sorted(list(normalized_emails)),
             "phone_numbers": sorted(list(normalized_phones)),
+            "hashes": sorted(list(normalized_hashes)),
         }
 
         final_count = sum(len(v) for v in result.values())

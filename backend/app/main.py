@@ -13,6 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.api.v1.router import api_router
+from app.db import init_db
+from app import __version__
+from app.core.security import RateLimitMiddleware, SecurityHeadersMiddleware
 
 # Setup structured logging
 setup_logging()
@@ -24,7 +27,12 @@ async def lifespan(app: FastAPI):
     """
     Application startup and shutdown lifespan context.
     """
-    logger.info(f"Starting {settings.APP_NAME} v0.1.0 in [{settings.ENVIRONMENT}] environment.")
+    logger.info(f"Starting {settings.APP_NAME} v{__version__} in [{settings.ENVIRONMENT}] environment.")
+    try:
+        init_db()
+    except Exception:
+        # Keep serving: health reports the problem and database routes retry on each request.
+        logger.exception("Database initialisation failed at startup")
     logger.info("Deterministic Threat Investigation Engine initialized.")
     yield
     logger.info("Shutting down ReconIQ backend services.")
@@ -33,7 +41,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     description="ReconIQ Enterprise Threat Analysis Platform. Evidence. Intelligence. Trust.",
-    version="0.1.0",
+    version=__version__,
     debug=settings.DEBUG,
     lifespan=lifespan,
     docs_url="/docs",
@@ -41,6 +49,11 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS is added last so it is the outermost layer: rate-limit (429) and auth errors
+# still carry CORS headers and reach the browser as readable responses.
 # Configure CORS Middleware
 if settings.CORS_ORIGINS:
     app.add_middleware(
@@ -50,6 +63,7 @@ if settings.CORS_ORIGINS:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
 
 # Register API v1 Router
 app.include_router(api_router, prefix=settings.API_V1_STR)
@@ -61,7 +75,7 @@ async def root():
     return {
         "app": settings.APP_NAME,
         "tagline": settings.TAGLINE,
-        "version": "0.1.0",
+        "version": __version__,
         "documentation": "/docs",
         "api_v1": f"{settings.API_V1_STR}/evidence/extract"
     }

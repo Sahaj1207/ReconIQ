@@ -1,0 +1,161 @@
+{
+  "description": "Hand-labelled benign and malicious evidence for the offline accuracy test. Domains in malicious samples are fictitious; 'kind' is text (pasted evidence) or eml (raw RFC 5322 message). Binary samples (Office, ZIP, Outlook .msg, QR PDF) are generated in tests/test_accuracy.py.",
+  "samples": [
+    {
+      "id": "mal-credential-lookalike",
+      "label": "malicious",
+      "kind": "text",
+      "content": "Your PayPal account has been limited. We noticed unusual sign-in activity. Verify your account within 24 hours or it will be permanently suspended: https://paypal-account-security.top/signin?session=8812"
+    },
+    {
+      "id": "mal-defanged-c2-alert",
+      "label": "malicious",
+      "kind": "text",
+      "content": "EDR ALERT high: host FIN-WS-044 beaconing every 60s to hxxp://185.220.101[.]47:8443/gate.php and update-cdn-sync[.]xyz. Parent process winword.exe spawned powershell.exe -enc. Payload dropped from hxxp://203.0.113[.]77/stage2.exe"
+    },
+    {
+      "id": "mal-tech-support",
+      "label": "malicious",
+      "kind": "text",
+      "content": "WARNING! Virus detected. Your computer is infected with Trojan Spyware. Call our support immediately at +1-888-555-0143 (toll free). Technical support will connect via AnyDesk remote access to remove the threat. Do not restart your computer."
+    },
+    {
+      "id": "mal-gift-card-bec",
+      "label": "malicious",
+      "kind": "text",
+      "content": "Hi, are you at your desk? I need you to buy 6 Apple gift cards ($200 each) for a client today, it is urgent. Scratch the codes and send photos to my personal email ceo.office.private@protonmail-secure.top. I'm in a meeting, can't call. Will refund by wire transfer tomorrow."
+    },
+    {
+      "id": "mal-crypto-giveaway",
+      "label": "malicious",
+      "kind": "text",
+      "content": "Congratulations! You have won 0.5 BTC in our anniversary lottery. To release your bitcoin to your crypto wallet, confirm your wallet and pay the 0.01 BTC network fee at https://binance-rewards-claim.click/claim within 48 hours."
+    },
+    {
+      "id": "mal-punycode",
+      "label": "malicious",
+      "kind": "text",
+      "content": "Security notice from Apple: your Apple ID was locked. Sign in to restore access: https://xn--pple-43d.com/appleid/verify and confirm your password."
+    },
+    {
+      "id": "mal-ip-literal-login",
+      "label": "malicious",
+      "kind": "text",
+      "content": "Office 365: your mailbox storage is full and incoming mail will be suspended. Log in to upgrade storage immediately: http://45.137.21.9/owa/login.php?user=finance"
+    },
+    {
+      "id": "mal-shortener-urgency",
+      "label": "malicious",
+      "kind": "text",
+      "content": "USPS: your package is on hold due to an incomplete address. Update your payment details within 24 hours or it will be returned: https://bit.ly/3uSPSredeliv"
+    },
+    {
+      "id": "mal-payload-link",
+      "label": "malicious",
+      "kind": "text",
+      "content": "Please find the overdue invoice attached. If you cannot open it, download the document here: https://docs-invoice-share.top/files/Invoice_88213.pdf.exe . Payment overdue, act now to avoid late fees."
+    },
+    {
+      "id": "mal-smishing-bank",
+      "label": "malicious",
+      "kind": "text",
+      "content": "HSBC ALERT: a new payee was added to your account. If this was not you, verify your identity now at hsbc-secure-verify.online/login or your account will be locked."
+    },
+    {
+      "id": "mal-eml-spoofed-auth-fail",
+      "label": "malicious",
+      "kind": "eml",
+      "content": "Return-Path: <bounce@mailer-relay.ru>\nReceived: from mailer-relay.ru (unknown [185.220.101.47]) by mx.example.com\nAuthentication-Results: mx.example.com; spf=fail smtp.mailfrom=mailer-relay.ru; dkim=none; dmarc=fail header.from=microsoft.com\nFrom: \"Microsoft Account Team\" <security@microsoft-support-alerts.top>\nReply-To: recovery@mail-collect.ru\nTo: victim@example.com\nSubject: Unusual sign-in activity\nMIME-Version: 1.0\nContent-Type: text/html; charset=utf-8\n\n<p>We detected unusual sign-in activity. Verify your account immediately or it will be suspended.</p><p><a href=\"https://microsoft-login-verify.top/auth\">https://account.microsoft.com/security</a></p>\n"
+    },
+    {
+      "id": "mal-eml-display-name",
+      "label": "malicious",
+      "kind": "eml",
+      "content": "Received: from smtp.freehost-mail.top (unknown [91.92.248.12]) by mx.example.com\nAuthentication-Results: mx.example.com; spf=softfail smtp.mailfrom=freehost-mail.top\nFrom: \"DocuSign <docs@docusign.net>\" <sender8812@freehost-mail.top>\nTo: victim@example.com\nSubject: Please review and sign: Payroll_Adjustment.pdf\nMIME-Version: 1.0\nContent-Type: text/plain; charset=utf-8\n\nYou have a document waiting for signature. Sign in with your email password to review it: https://docusign-review.top/envelope/88a1 . This link will expire in 24 hours.\n"
+    },
+    {
+      "id": "mal-eml-exe-attachment",
+      "label": "malicious",
+      "kind": "eml",
+      "content": "Received: from mx.shipping-notice.top (unknown [194.26.192.71]) by mx.example.com\nFrom: \"DHL Express\" <noreply@dhl-shipping-notice.top>\nTo: victim@example.com\nSubject: Shipment delivery failed - action required\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"b1\"\n\n--b1\nContent-Type: text/plain; charset=utf-8\n\nYour parcel could not be delivered. Open the attached form and confirm your address immediately.\n--b1\nContent-Type: application/octet-stream\nContent-Disposition: attachment; filename=\"DHL_Delivery_Form.scr\"\nContent-Transfer-Encoding: base64\n\nTVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQAAAAAAAAAA=\n--b1--\n"
+    },
+    {
+      "id": "mal-new-tld-credential",
+      "label": "malicious",
+      "kind": "text",
+      "content": "Netflix: we were unable to process your last payment. Update your billing information to avoid interruption of service: https://netflix-billing-update.xyz/account/payment"
+    },
+    {
+      "id": "ben-internal-meeting",
+      "label": "benign",
+      "kind": "text",
+      "content": "Hi team, the quarterly planning meeting moved to Thursday at 2pm in room 4B. Agenda: roadmap review, hiring plan, and the offsite. Notes from last time are on the wiki. Thanks, Priya"
+    },
+    {
+      "id": "ben-paypal-receipt",
+      "label": "benign",
+      "kind": "text",
+      "content": "You sent a payment of $24.99 USD to Spotify. Transaction ID 7XK22981BH. View the details of this transaction in your account at https://www.paypal.com/activity. Thanks for using PayPal."
+    },
+    {
+      "id": "ben-github-password-reset",
+      "label": "benign",
+      "kind": "text",
+      "content": "We heard that you lost your GitHub password. Sorry about that! But don't worry, you can use the following link to reset your password: https://github.com/password_reset/9c1b2e. If you don't use this link within 3 hours, it will expire."
+    },
+    {
+      "id": "ben-microsoft-security-info",
+      "label": "benign",
+      "kind": "text",
+      "content": "Microsoft account: security info was added. The following security info was recently added to the Microsoft account ja***@outlook.com. If you added this, you can ignore this message. Review your security info at https://account.microsoft.com/security"
+    },
+    {
+      "id": "ben-newsletter-tracking",
+      "label": "benign",
+      "kind": "eml",
+      "content": "Received: from o1.email.example-news.com (o1.email.example-news.com [149.72.123.10]) by mx.example.com\nAuthentication-Results: mx.example.com; spf=pass smtp.mailfrom=example-news.com; dkim=pass; dmarc=pass\nFrom: \"The Weekly Brief\" <newsletter@example-news.com>\nTo: reader@example.com\nSubject: This week: five stories worth your time\nMIME-Version: 1.0\nContent-Type: text/html; charset=utf-8\n\n<p>Here are this week's top reads.</p><p><a href=\"https://u1234.ct.sendgrid.net/ls/click?upn=abc\">www.example-news.com/stories/climate</a></p><p><a href=\"https://www.example-news.com/unsubscribe\">Unsubscribe</a></p>\n"
+    },
+    {
+      "id": "ben-it-awareness",
+      "label": "benign",
+      "kind": "text",
+      "content": "Reminder from IT Security: phishing emails often create urgency and ask you to verify credentials. Never enter your password on a page you reached from an email. Report suspicious messages with the Report button in Outlook. Questions? Contact the service desk on extension 4400."
+    },
+    {
+      "id": "ben-vendor-invoice",
+      "label": "benign",
+      "kind": "eml",
+      "content": "Received: from mail.acme-supplies.com (mail.acme-supplies.com [52.10.33.4]) by mx.example.com\nAuthentication-Results: mx.example.com; spf=pass smtp.mailfrom=acme-supplies.com; dkim=pass; dmarc=pass\nFrom: \"Acme Supplies Billing\" <billing@acme-supplies.com>\nTo: ap@example.com\nSubject: Invoice INV-2026-1043 for October\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"b2\"\n\n--b2\nContent-Type: text/plain; charset=utf-8\n\nHello, please find attached invoice INV-2026-1043 for October deliveries. Payment terms are net 30. Thank you for your business.\n--b2\nContent-Type: application/pdf\nContent-Disposition: attachment; filename=\"INV-2026-1043.pdf\"\nContent-Transfer-Encoding: base64\n\nJVBERi0xLjQKJSBpbnZvaWNlCg==\n--b2--\n"
+    },
+    {
+      "id": "ben-dev-log",
+      "label": "benign",
+      "kind": "text",
+      "content": "2026-10-14 09:12:01 INFO api started on 0.0.0.0:8080\n2026-10-14 09:12:04 INFO connected to postgres at 10.0.3.15:5432\n2026-10-14 09:13:22 WARN slow query (812ms) GET /api/orders?page=3 from 192.168.1.44\n2026-10-14 09:15:10 INFO health check ok"
+    },
+    {
+      "id": "ben-amazon-shipping",
+      "label": "benign",
+      "kind": "text",
+      "content": "Your Amazon order #112-4432199-8812 has shipped and will arrive Friday. Track your package at https://www.amazon.com/gp/your-account/order-history. Thanks for shopping with us."
+    },
+    {
+      "id": "ben-calendar-invite",
+      "label": "benign",
+      "kind": "text",
+      "content": "Invitation: Design review @ Wed Oct 15, 2026 10am - 11am (IST). Join with Google Meet: https://meet.google.com/abc-defg-hij. Organizer: maria@example.com. Reply for maria@example.com: Yes, No, Maybe."
+    },
+    {
+      "id": "ben-slack-notification",
+      "label": "benign",
+      "kind": "text",
+      "content": "You have 3 unread messages in #release-planning on Slack. Open Slack at https://app.slack.com/client to catch up. To change how often you receive these emails, visit your notification preferences."
+    },
+    {
+      "id": "ben-bank-statement",
+      "label": "benign",
+      "kind": "text",
+      "content": "Your October statement for the account ending 4821 is now available. Sign in to online banking at https://www.chase.com to view it. We will never ask for your password or one-time code by email."
+    }
+  ]
+}

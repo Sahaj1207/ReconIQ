@@ -18,6 +18,7 @@ class IOCSummary(BaseModel):
     domain_count: int = Field(default=0, description="Count of unique domain names")
     email_count: int = Field(default=0, description="Count of unique email addresses")
     phone_count: int = Field(default=0, description="Count of unique phone numbers")
+    hash_count: int = Field(default=0, description="Count of unique file hashes")
 
 
 class IOCResults(BaseModel):
@@ -28,3 +29,4 @@ class IOCResults(BaseModel):
     domains: List[str] = Field(default_factory=list, description="Extracted domain names")
     emails: List[str] = Field(default_factory=list, description="Extracted email addresses")
     phone_numbers: List[str] = Field(default_factory=list, description="Extracted phone numbers")
+    hashes: List[str] = Field(default_factory=list, description="Extracted file hashes (MD5/SHA-1/SHA-256)")

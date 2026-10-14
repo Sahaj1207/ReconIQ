@@ -20,9 +20,10 @@ Future Extension Notes:
 - Asynchronous DAG step execution for parallel independent stages.
 """
 
+import inspect
 import time
 import logging
-from typing import List, Optional, Union
+from typing import Awaitable, Callable, List, Optional, Union
 
 from app.ingestion.ingested_input import IngestedInput
 from app.pipeline.models import (
@@ -37,10 +38,14 @@ from app.pipeline.steps import (
     NormalizationStep,
     ValidationStep,
     ThreatIntelStep,
-    RiskAssessmentStep
+    RiskAssessmentStep,
+    SummaryStep
 )
 
 logger = logging.getLogger(__name__)
+
+# Progress callback: (stage_name, status, duration_ms, error). May be sync or async.
+StageCallback = Callable[[str, StageStatus, float, Optional[str]], Union[None, Awaitable[None]]]
 
 
 class InvestigationPipeline:
@@ -65,17 +70,36 @@ class InvestigationPipeline:
                 ValidationStep(),
                 ThreatIntelStep(),
                 RiskAssessmentStep(),
+                SummaryStep(),
             ]
+
+    @property
+    def stage_names(self) -> List[str]:
+        return [step.name for step in self.steps]
+
+    @staticmethod
+    async def _notify(on_stage: Optional[StageCallback], *args) -> None:
+        """Reports progress; a failing progress callback never fails the investigation."""
+        if on_stage is None:
+            return
+        try:
+            outcome = on_stage(*args)
+            if inspect.isawaitable(outcome):
+                await outcome
+        except Exception as exc:
+            logger.warning(f"Stage progress callback failed: {sanitize_sensitive_data(str(exc))}")
 
     async def run(
         self,
-        payload: Union[InvestigationRequest, IngestedInput, str]
+        payload: Union[InvestigationRequest, IngestedInput, str],
+        on_stage: Optional[StageCallback] = None,
     ) -> InvestigationResult:
         """
         Executes end-to-end investigation pipeline on provided payload.
 
         Args:
             payload (Union[InvestigationRequest, IngestedInput, str]): Input payload object or text string.
+            on_stage (Optional[StageCallback]): Called when each stage starts (RUNNING) and finishes.
 
         Returns:
             InvestigationResult: Complete structured investigation response DTO.
@@ -112,6 +136,7 @@ class InvestigationPipeline:
         for step in self.steps:
             stage_start = time.perf_counter()
             logger.info(f"[{context.investigation_id}] Stage [{step.name}] started")
+            await self._notify(on_stage, step.name, StageStatus.RUNNING, 0.0, None)
 
             try:
                 await step.execute(context)
@@ -123,6 +148,7 @@ class InvestigationPipeline:
                     duration_ms=duration_ms
                 )
                 completed_count += 1
+                await self._notify(on_stage, step.name, StageStatus.COMPLETED, duration_ms, None)
                 logger.info(f"[{context.investigation_id}] Stage [{step.name}] completed in {round(duration_ms, 2)}ms")
 
             except Exception as exc:
@@ -142,6 +168,7 @@ class InvestigationPipeline:
                     error=clean_err_msg
                 )
                 context.add_error(f"Stage '{step.name}' failed: {clean_err_msg}")
+                await self._notify(on_stage, step.name, StageStatus.FAILED, duration_ms, clean_err_msg)
 
         # Step 4: Determine overall pipeline status
         if failed_count == 0:

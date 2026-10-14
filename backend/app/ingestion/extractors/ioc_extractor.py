@@ -33,6 +33,7 @@ from app.utils.regex_patterns import (
     EMAIL_PATTERN,
     DOMAIN_PATTERN,
     PHONE_PATTERN,
+    HASH_PATTERN,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,10 @@ class IOCExtractor(BaseExtractor):
             IngestionSourceType.EMAIL,
             IngestionSourceType.OCR_TEXT,
             IngestionSourceType.BROWSER_UPLOAD,
+            IngestionSourceType.PDF_FILE,
+            IngestionSourceType.QR_CODE,
+            IngestionSourceType.IMAGE,
+            IngestionSourceType.APK_FILE,
         ]
 
     def extract(self, input_data: IngestedInput) -> Dict[str, List[str]]:
@@ -76,6 +81,7 @@ class IOCExtractor(BaseExtractor):
                 "domains": [],
                 "emails": [],
                 "phone_numbers": [],
+                "hashes": [],
             }
 
         # Refang text artifacts if refang flag is set in metadata (default True)
@@ -89,6 +95,7 @@ class IOCExtractor(BaseExtractor):
         url_set: Set[str] = set()
         domain_set: Set[str] = set()
         phone_set: Set[str] = set()
+        hash_set: Set[str] = set()
 
         # 1. IPv4 Extraction & Validation
         try:
@@ -173,6 +180,13 @@ class IOCExtractor(BaseExtractor):
             except Exception as exc:
                 logger.warning(f"Error during Phone fallback extraction phase: {exc}")
 
+        # 7. File Hash Extraction (MD5 / SHA-1 / SHA-256)
+        try:
+            for match in HASH_PATTERN.findall(processed_text):
+                hash_set.add(match.lower())
+        except Exception as exc:
+            logger.warning(f"Error during Hash extraction phase: {exc}")
+
         # Return deterministically sorted indicator lists
         return {
             "ipv4": sorted(list(ipv4_set)),
@@ -181,4 +195,5 @@ class IOCExtractor(BaseExtractor):
             "domains": sorted(list(domain_set)),
             "emails": sorted(list(email_set)),
             "phone_numbers": sorted(list(phone_set)),
+            "hashes": sorted(list(hash_set)),
         }

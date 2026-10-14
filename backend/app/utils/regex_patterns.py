@@ -31,7 +31,7 @@ IPV6_PATTERN = re.compile(
 URL_PATTERN = re.compile(
     r'\b(?:https?|ftp|ws|wss)://'
     r'(?:[a-zA-Z0-9\.\-_]+(?::[a-zA-Z0-9\.\-_]+)?@)?'
-    r'(?:[a-zA-Z0-9\-_]+\.)+[a-zA-Z]{2,63}'
+    r'(?:(?:[a-zA-Z0-9\-_]+\.)+[a-zA-Z]{2,63}|(?:\d{1,3}\.){3}\d{1,3})'
     r'(?::\d{1,5})?'
     r'(?:/[^\s()<>"]*)?',
     re.IGNORECASE
@@ -49,6 +49,9 @@ DOMAIN_PATTERN = re.compile(
     r'(?:[a-zA-Z]{2,63})\b',
     re.IGNORECASE
 )
+
+# File Hash Patterns (MD5 / SHA-1 / SHA-256 hex digests)
+HASH_PATTERN = re.compile(r'\b(?:[a-fA-F0-9]{64}|[a-fA-F0-9]{40}|[a-fA-F0-9]{32})\b')
 
 # Fallback Phone Number Pattern (Matches international formats +1-800-555-0199 or +44 20 7946 0958)
 PHONE_PATTERN = re.compile(

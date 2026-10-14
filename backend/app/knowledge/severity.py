@@ -2,16 +2,7 @@
 ReconIQ Severity Standard
 
 Purpose:
-Defines standard platform-wide threat severity levels and color mappings.
-
-Responsibilities:
-- Provide strict Enum for severity ratings across risk engines and reporting DTOs
-
-Future Implementation Notes:
-- Configurable severity score bounds per enterprise tenant.
-
-TODO:
-- [ ] Implement score-to-severity mapping helper method.
+Defines standard platform-wide threat severity levels.
 """
 
 from enum import Enum
@@ -24,3 +15,13 @@ class SeverityLevel(str, Enum):
     MEDIUM = "MEDIUM"
     LOW = "LOW"
     INFORMATIONAL = "INFORMATIONAL"
+
+    @classmethod
+    def from_score(cls, score: float) -> "SeverityLevel":
+        """Maps a 0-100 score onto the platform severity scale."""
+        from app.risk_engine.weights import map_score_to_severity
+        return cls(map_score_to_severity(score))
+
+    @property
+    def rank(self) -> int:
+        return ["INFORMATIONAL", "LOW", "MEDIUM", "HIGH", "CRITICAL"].index(self.value)

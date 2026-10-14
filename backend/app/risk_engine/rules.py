@@ -24,6 +24,18 @@ from app.risk_engine.weights import RiskWeights
 
 logger = logging.getLogger(__name__)
 
+# Framework context for the original rule library (new rules declare theirs inline).
+RULE_METADATA: Dict[str, Dict[str, List[str]]] = {
+    "RULE_VAL_001": {"categories": ["suspicious_infrastructure"], "mitre": ["T1036"], "cwe": ["CWE-451"]},
+    "RULE_VAL_002": {"categories": ["suspicious_infrastructure"], "mitre": ["T1036", "T1583.001"], "cwe": ["CWE-451"]},
+    "RULE_VAL_003": {"categories": ["email_spoofing"], "mitre": ["T1656"], "cwe": ["CWE-290"]},
+    "RULE_INT_001": {"categories": ["suspicious_infrastructure"], "mitre": ["T1583.001", "T1071.001"]},
+    "RULE_INT_002": {"categories": ["suspicious_infrastructure"], "mitre": ["T1583.001", "T1071.001"]},
+    "RULE_EVI_001": {"categories": ["phishing_email"], "mitre": ["T1027"]},
+    "RULE_EVI_002": {"categories": ["suspicious_infrastructure"]},
+    "RULE_EVI_003": {"categories": ["suspicious_infrastructure"], "mitre": ["T1583.003"]},
+}
+
 
 class BaseRule(ABC):
     """
@@ -37,7 +49,10 @@ class BaseRule(ABC):
         description: str,
         weight: float,
         severity: str,
-        enabled: bool = True
+        enabled: bool = True,
+        categories: Optional[List[str]] = None,
+        mitre: Optional[List[str]] = None,
+        cwe: Optional[List[str]] = None,
     ) -> None:
         self.id = rule_id
         self.name = name
@@ -45,6 +60,10 @@ class BaseRule(ABC):
         self.weight = weight
         self.severity = severity
         self.enabled = enabled
+        meta = RULE_METADATA.get(rule_id, {})
+        self.categories: List[str] = categories if categories is not None else meta.get("categories", [])
+        self.mitre: List[str] = mitre if mitre is not None else meta.get("mitre", [])
+        self.cwe: List[str] = cwe if cwe is not None else meta.get("cwe", [])
 
     @abstractmethod
     def evaluate(self, context: Dict[str, Any]) -> Tuple[bool, List[RiskFinding], Dict[str, Any]]:
@@ -170,6 +189,24 @@ class InvalidEmailRule(BaseRule):
 
 # --- Threat Intelligence Rules ---
 
+FLAGGING_SEVERITIES = {"MEDIUM", "HIGH", "CRITICAL"}
+
+
+def is_flagged_malicious(res: Any) -> bool:
+    """
+    A provider response counts as a malicious verdict only when the lookup succeeded AND it carries
+    at least one MEDIUM+ threat indicator. Provider `confidence` describes certainty in the verdict
+    (a clean VirusTotal result reports 0.8), so it must never be read as maliciousness on its own.
+    """
+    get = (lambda k, d=None: res.get(k, d)) if isinstance(res, dict) else (lambda k, d=None: getattr(res, k, d))
+    if str(get("status", "")).split(".")[-1] != "SUCCESS":
+        return False
+    for ind in get("threat_indicators", []) or []:
+        sev = ind.get("severity") if isinstance(ind, dict) else getattr(ind, "severity", "")
+        if str(sev).upper() in FLAGGING_SEVERITIES:
+            return True
+    return False
+
 class ProviderMaliciousRule(BaseRule):
     """Triggers when a threat intel provider reports malicious indicators or high confidence threat."""
     def __init__(self) -> None:
@@ -195,7 +232,7 @@ class ProviderMaliciousRule(BaseRule):
                 provider = getattr(res, "provider", "intel") if hasattr(res, "provider") else res.get("provider", "intel")
                 artifact = getattr(res, "artifact", "target") if hasattr(res, "artifact") else res.get("artifact", "target")
 
-                if (status == "SUCCESS" or status == "SUCCESS") and (conf >= 0.7 or len(indicators) > 0):
+                if is_flagged_malicious(res):
                     flagged_artifacts.append((provider, artifact, conf))
 
         if flagged_artifacts:
@@ -236,7 +273,7 @@ class ProviderConsensusRule(BaseRule):
                 provider = getattr(res, "provider", "intel") if hasattr(res, "provider") else res.get("provider", "intel")
                 artifact = getattr(res, "artifact", "target") if hasattr(res, "artifact") else res.get("artifact", "target")
 
-                if status == "SUCCESS" and conf >= 0.7:
+                if is_flagged_malicious(res) and provider not in artifact_providers.get(artifact, []):
                     artifact_providers.setdefault(artifact, []).append(provider)
 
         consensus_artifacts = {art: provs for art, provs in artifact_providers.items() if len(provs) >= 2}
@@ -274,21 +311,74 @@ class ProviderUnavailableRule(BaseRule):
             if not isinstance(items, list):
                 continue
             for res in items:
-                status = getattr(res, "status", None) or (res.get("status") if isinstance(res, dict) else None)
-                provider = getattr(res, "provider", "intel") if hasattr(res, "provider") else res.get("provider", "intel")
+                get = (lambda k, d=None, r=res: r.get(k, d)) if isinstance(res, dict) else (lambda k, d=None, r=res: getattr(r, k, d))
+                status = get("status")
+                status = str(getattr(status, "value", status))
                 if status in ("FAILED", "UNAVAILABLE", "RATE_LIMITED"):
-                    failed_providers.append((provider, status))
+                    failed_providers.append((get("provider", "intel"), status, get("artifact", "target"),
+                                             get("error_message")))
 
         if failed_providers:
+            provider, status, artifact, error = failed_providers[0]
+            description = f"{provider} lookup {status.lower().replace('_', ' ')} for '{artifact}'"
+            if error:
+                description += f": {str(error)[:160]}"
+            if len(failed_providers) > 1:
+                description += f" (+{len(failed_providers) - 1} more)"
             finding = RiskFinding(
                 finding_id=f"{self.id}_FINDING",
                 title="Intel Provider Degradation Notice",
-                description=f"Provider lookup degraded: {failed_providers[0][0]} returned {failed_providers[0][1]}",
+                description=description,
                 severity=self.severity,
                 score_impact=self.weight,
-                artifact=None
+                artifact=artifact
             )
-            return True, [finding], {"failed_providers": failed_providers}
+            return True, [finding], {"failed_providers": [
+                {"provider": p, "status": s, "artifact": a, "error": e} for p, s, a, e in failed_providers]}
+        return False, [], {}
+
+
+# Indicator categories that are detections (as opposed to context such as Tor exit nodes or open CVEs)
+DETECTION_CATEGORIES = {"Malicious Detection", "Suspicious Detection", "Phishing", "Known Malware", "C2 / Botnet",
+                        "Community Flagged"}
+
+
+class WeakProviderDetectionRule(BaseRule):
+    """A provider reported a detection too weak to be a verdict, e.g. one or two VirusTotal engines."""
+    def __init__(self) -> None:
+        super().__init__(
+            rule_id="RULE_INT_005",
+            name="Weak Provider Detection",
+            description="A threat intel provider reported an uncorroborated detection (e.g. 1-2 VirusTotal engines)",
+            weight=RiskWeights.LOW,
+            severity="LOW"
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> Tuple[bool, List[RiskFinding], Dict[str, Any]]:
+        weak = []
+        for items in context.get("intel_results", {}).values():
+            if not isinstance(items, list):
+                continue
+            for res in items:
+                get = (lambda k, d=None, r=res: r.get(k, d)) if isinstance(res, dict) else (lambda k, d=None, r=res: getattr(r, k, d))
+                if str(get("status", "")).split(".")[-1] != "SUCCESS" or is_flagged_malicious(res):
+                    continue
+                for ind in get("threat_indicators", []) or []:
+                    ind_get = ind.get if isinstance(ind, dict) else (lambda k, d=None, i=ind: getattr(i, k, d))
+                    if ind_get("category") in DETECTION_CATEGORIES and str(ind_get("severity", "")).upper() == "LOW":
+                        weak.append((get("provider", "intel"), get("artifact", "target"), ind_get("description", "")))
+                        break
+        if weak:
+            provider, artifact, detail = weak[0]
+            finding = RiskFinding(
+                finding_id=f"{self.id}_FINDING",
+                title="Uncorroborated Provider Detection",
+                description=f"{provider}: {detail}" + (f" (+{len(weak) - 1} more)" if len(weak) > 1 else ""),
+                severity=self.severity,
+                score_impact=self.weight,
+                artifact=artifact
+            )
+            return True, [finding], {"weak_detections": [{"provider": p, "artifact": a} for p, a, _ in weak]}
         return False, [], {}
 
 
@@ -331,7 +421,7 @@ class MultipleSuspiciousArtifactsRule(BaseRule):
         super().__init__(
             rule_id="RULE_EVI_002",
             name="High Artifact Density",
-            description="Payload contains a high density of extracted indicators (>= 5)",
+            description="Payload contains a high density of extracted indicators (>= 8)",
             weight=RiskWeights.MEDIUM,
             severity="MEDIUM"
         )
@@ -340,7 +430,7 @@ class MultipleSuspiciousArtifactsRule(BaseRule):
         evidence = context.get("evidence", {})
         total_count = sum(len(v) for v in evidence.values() if isinstance(v, list))
 
-        if total_count >= 5:
+        if total_count >= 8:
             finding = RiskFinding(
                 finding_id=f"{self.id}_FINDING",
                 title="High Indicator Density Detected",
@@ -406,9 +496,15 @@ class RuleRegistry:
         self.register_rule(ProviderMaliciousRule())
         self.register_rule(ProviderConsensusRule())
         self.register_rule(ProviderUnavailableRule())
+        self.register_rule(WeakProviderDetectionRule())
         self.register_rule(DefangedIndicatorDetectedRule())
         self.register_rule(MultipleSuspiciousArtifactsRule())
         self.register_rule(PublicIPPresentRule())
+
+        # Extended content, email, file and intel rule library
+        from app.risk_engine.content_rules import EXTENDED_RULES
+        for rule_cls in EXTENDED_RULES:
+            self.register_rule(rule_cls())
 
     def register_rule(self, rule: BaseRule) -> None:
         """Registers a new detection rule."""

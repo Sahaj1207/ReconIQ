@@ -32,6 +32,7 @@ Rate Limiting:
 """
 
 import os
+import re
 import time
 import base64
 import asyncio
@@ -49,6 +50,17 @@ from app.integrations.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Engines that must agree before a VirusTotal detection counts as a malicious verdict
+MIN_ENGINES_FOR_VERDICT = 3
+
+# (indicator category, label pattern, severity when corroborated, description, tags)
+THREAT_LABELS = [
+    ("Phishing", re.compile(r"phishing"), "HIGH", "Categorized as phishing threat infrastructure", ["phishing"]),
+    ("Known Malware", re.compile(r"malware|trojan"), "CRITICAL", "Associated with known malware distribution", ["malware"]),
+    ("C2 / Botnet", re.compile(r"\bc2\b|botnet|command and control"), "CRITICAL",
+     "Identified as Command & Control or Botnet infrastructure", ["c2", "botnet"]),
+]
 
 
 class CacheEntry:
@@ -375,19 +387,28 @@ class VirusTotalProvider(BaseThreatIntelProvider):
         else:
             confidence = 0.8  # Clean / harmless consensus
 
-        # Generate Indicators
-        if malicious > 0:
+        # Generate Indicators. One or two engines out of ~90 is a weak signal (single-engine detections
+        # are a common source of false positives), so it is reported as LOW and never as a verdict.
+        if malicious >= MIN_ENGINES_FOR_VERDICT:
             indicators.append(ThreatIndicator(
                 category="Malicious Detection",
                 severity="HIGH" if malicious < 5 else "CRITICAL",
                 description=f"Flagged as malicious by {malicious} security engine(s) on VirusTotal",
                 tags=tags
             ))
+        elif malicious > 0:
+            indicators.append(ThreatIndicator(
+                category="Malicious Detection",
+                severity="LOW",
+                description=f"Flagged as malicious by {malicious} security engine(s) on VirusTotal "
+                            f"(below the {MIN_ENGINES_FOR_VERDICT}-engine threshold; isolated detections are often false positives)",
+                tags=tags
+            ))
 
         if suspicious > 0:
             indicators.append(ThreatIndicator(
                 category="Suspicious Detection",
-                severity="MEDIUM",
+                severity="MEDIUM" if suspicious >= MIN_ENGINES_FOR_VERDICT else "LOW",
                 description=f"Flagged as suspicious by {suspicious} engine(s) on VirusTotal",
                 tags=[]
             ))
@@ -400,34 +421,21 @@ class VirusTotalProvider(BaseThreatIntelProvider):
                 tags=[]
             ))
 
-        # Check for phishing, malware, c2 tags/categories
-        combined_text = (
-            " ".join(tags) + " " +
-            " ".join(str(v) for v in (categories.values() if isinstance(categories, dict) else categories))
-        ).lower()
-
-        if "phishing" in combined_text:
+        # Threat categories. `categories` holds one label per categorisation vendor, so a single vendor's
+        # label is a weak signal; VirusTotal's own tags or agreement between vendors make it a verdict.
+        labels = [str(v).lower() for v in (categories.values() if isinstance(categories, dict) else categories)]
+        tag_text = " ".join(tags).lower()
+        for category, pattern, severity, description, ind_tags in THREAT_LABELS:
+            vendors = sum(1 for label in labels if pattern.search(label))
+            tagged = bool(pattern.search(tag_text))
+            if not (vendors or tagged):
+                continue
+            strong = tagged or vendors >= 2
             indicators.append(ThreatIndicator(
-                category="Phishing",
-                severity="HIGH",
-                description="Categorized as phishing threat infrastructure",
-                tags=["phishing"]
-            ))
-
-        if "malware" in combined_text or "trojan" in combined_text:
-            indicators.append(ThreatIndicator(
-                category="Known Malware",
-                severity="CRITICAL",
-                description="Associated with known malware distribution",
-                tags=["malware"]
-            ))
-
-        if "c2" in combined_text or "botnet" in combined_text:
-            indicators.append(ThreatIndicator(
-                category="C2 / Botnet",
-                severity="CRITICAL",
-                description="Identified as Command & Control or Botnet infrastructure",
-                tags=["c2", "botnet"]
+                category=category,
+                severity=severity if strong else "LOW",
+                description=description if strong else f"{description} by 1 categorisation vendor only",
+                tags=ind_tags
             ))
 
         votes = attributes.get("total_votes", {})

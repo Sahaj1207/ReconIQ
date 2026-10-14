@@ -6,6 +6,9 @@ Returns system operational status, version, and active environment.
 """
 
 from fastapi import APIRouter, status
+from fastapi.concurrency import run_in_threadpool
+from app import __version__
+from app.db.database import database_error, init_db
 from app.core.config import settings
 from app.schemas.health import HealthResponse
 
@@ -21,11 +24,19 @@ router = APIRouter()
 )
 async def health_check() -> HealthResponse:
     """
-    Returns platform health status.
+    Returns platform health status. The API itself stays up when the database is down, so the
+    database is reported separately (status becomes "degraded").
     """
+    try:
+        await run_in_threadpool(init_db)  # no-op once migrations have succeeded
+        db_error = None
+    except Exception:
+        db_error = database_error() or "unknown error"
     return HealthResponse(
-        status="healthy",
+        status="degraded" if db_error else "healthy",
         app_name=settings.APP_NAME,
-        version="0.1.0",
-        environment=settings.ENVIRONMENT
+        version=__version__,
+        environment=settings.ENVIRONMENT,
+        database="unavailable" if db_error else "ok",
+        database_error=db_error,
     )

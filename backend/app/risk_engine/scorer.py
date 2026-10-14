@@ -37,6 +37,9 @@ from app.risk_engine.models import RiskAssessment, RiskFinding, AppliedRule
 from app.risk_engine.rules import RuleRegistry, BaseRule
 from app.risk_engine.weights import map_score_to_severity
 from app.risk_engine.confidence import ConfidenceEngine
+from app.knowledge.mitre_attack import resolve_techniques
+from app.knowledge.cwe import resolve_cwes
+from app.knowledge.taxonomy import rank_categories
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +63,8 @@ class RiskScorer:
         evidence: Dict[str, Any],
         validation_results: Optional[Dict[str, Any]] = None,
         intel_results: Optional[Dict[str, Any]] = None,
-        raw_text: str = ""
+        raw_text: str = "",
+        ingestion: Optional[Dict[str, Any]] = None
     ) -> RiskAssessment:
         """
         Executes deterministic risk assessment on accumulated investigation evidence.
@@ -80,7 +84,8 @@ class RiskScorer:
             "evidence": evidence or {},
             "validation_results": validation_results or {},
             "intel_results": intel_results or {},
-            "raw_text": raw_text or ""
+            "raw_text": raw_text or "",
+            "ingestion": ingestion or {}
         }
 
         enabled_rules = self.registry.get_enabled_rules()
@@ -90,6 +95,7 @@ class RiskScorer:
         findings: List[RiskFinding] = []
         applied_rules: List[AppliedRule] = []
         evaluated_rule_ids: Set[str] = set()
+        category_weights: Dict[str, float] = {}
 
         # Evaluate rules sequentially with failure isolation
         for rule in enabled_rules:
@@ -117,6 +123,10 @@ class RiskScorer:
 
                 if matched:
                     raw_score += rule.weight
+                    for finding in rule_findings:
+                        self._enrich_finding(finding, rule)
+                        for category in finding.categories:
+                            category_weights[category] = category_weights.get(category, 0.0) + max(rule.weight, 1.0)
                     findings.extend(rule_findings)
                     logger.debug(
                         f"Rule [{rule.id}: {rule.name}] MATCHED (+{rule.weight} pts, {rule_latency}ms)"
@@ -169,8 +179,21 @@ class RiskScorer:
             f"Latency: {execution_time_ms}ms"
         )
 
+        threat_categories = rank_categories(category_weights)
+        if total_score < 20.0 or not threat_categories:
+            classification = "no_threat_identified"
+        else:
+            classification = threat_categories[0]
+        # Order techniques by the score contribution of the findings that evidence them
+        techniques = resolve_techniques(
+            t["id"] for f in sorted(findings, key=lambda f: -f.score_impact) for t in f.mitre_techniques
+        )
+
         return RiskAssessment(
             total_score=total_score,
+            classification=classification,
+            threat_categories=threat_categories,
+            mitre_techniques=techniques,
             severity=severity,
             confidence=confidence,
             findings=findings,
@@ -178,3 +201,14 @@ class RiskScorer:
             artifact_breakdown=artifact_breakdown,
             execution_time_ms=execution_time_ms
         )
+
+    @staticmethod
+    def _enrich_finding(finding: RiskFinding, rule: BaseRule) -> None:
+        """Attaches rule provenance and knowledge-base references to a finding."""
+        finding.rule_id = finding.rule_id or rule.id
+        if not finding.categories:
+            finding.categories = list(getattr(rule, "categories", []))
+        if not finding.mitre_techniques:
+            finding.mitre_techniques = resolve_techniques(getattr(rule, "mitre", []))
+        if not finding.cwes:
+            finding.cwes = resolve_cwes(getattr(rule, "cwe", []))

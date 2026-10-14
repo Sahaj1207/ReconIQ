@@ -4,6 +4,18 @@ ReconIQ Pytest Configuration & Fixtures
 Provides test client fixtures and sample threat intelligence payload samples for unit & API tests.
 """
 
+import os
+
+# Keep the test suite offline: no keyless intel calls, no provider keys.
+os.environ["INTEL_KEYLESS_PROVIDERS"] = "false"
+# TEST_DATABASE_URL runs the suite against a real server, e.g. postgresql://user@localhost/reconiq_test
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "sqlite://")
+os.environ["RATE_LIMIT_PER_MINUTE"] = "0"
+os.environ["API_KEYS"] = ""
+for _key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "URLHAUS_AUTH_KEY", "GOOGLE_SAFE_BROWSING_API_KEY",
+             "HIBP_API_KEY"):
+    os.environ[_key] = ""
+
 import pytest
 from httpx import AsyncClient, ASGITransport
 from app.main import app
@@ -23,6 +35,8 @@ def sample_threat_text() -> str:
 @pytest.fixture
 async def async_client():
     """Provides HTTPX async test client for FastAPI endpoint integration testing."""
+    from app.db import init_db
+    init_db()  # ASGITransport does not run the lifespan handler
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test"

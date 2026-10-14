@@ -184,3 +184,12 @@ async def test_lookup_all_facade():
     assert "domains" in results
     assert len(results["ipv4"]) == 2  # VT + AbuseIPDB
     assert len(results["domains"]) == 1  # VT only
+
+
+@pytest.mark.asyncio
+async def test_manager_normalizes_plural_categories_before_provider_lookup():
+    """Pipeline categories like 'urls' must reach providers as 'url', not be rejected as unsupported."""
+    manager = ThreatIntelManager()
+    manager.register_provider(MockVirusTotalProvider())
+    results = await manager.lookup_all({"domains": ["example.com"]})
+    assert [r.status for r in results["domains"]] == [LookupStatus.SUCCESS]

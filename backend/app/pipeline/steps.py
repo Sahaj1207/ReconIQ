@@ -28,7 +28,6 @@ from app.ingestion.collector import EvidenceCollector
 from app.utils.normalizer import Normalizer
 from app.validators.validator import Validator
 from app.integrations.manager import ThreatIntelManager
-from app.integrations.providers.virustotal import VirusTotalProvider
 from app.risk_engine.scorer import RiskScorer
 
 logger = logging.getLogger(__name__)
@@ -125,13 +124,9 @@ class ThreatIntelStep(BasePipelineStep):
         if manager:
             self.manager = manager
         else:
-            # Register default threat intel provider clients
-            self.manager = ThreatIntelManager()
-            try:
-                vt_provider = VirusTotalProvider()
-                self.manager.register_provider(vt_provider)
-            except Exception as exc:
-                logger.warning(f"Could not instantiate default VirusTotal provider in pipeline step: {exc}")
+            # Register every configured threat intel provider
+            from app.integrations.registry import build_default_manager
+            self.manager = build_default_manager()
 
     @property
     def name(self) -> str:
@@ -168,6 +163,25 @@ class RiskAssessmentStep(BasePipelineStep):
             evidence=context.normalized_evidence or context.collected_evidence,
             validation_results=context.validation_results,
             intel_results=context.threat_intelligence,
-            raw_text=raw_text_content
+            raw_text=raw_text_content,
+            ingestion=(context.raw_input.metadata or {}).get("analysis") if hasattr(context.raw_input, "metadata") else None
         )
         context.risk_assessment = assessment
+
+
+class SummaryStep(BasePipelineStep):
+    """
+    Step 6: Analyst summary.
+
+    Runs after scoring and reads a snapshot of the finished assessment. Its output is stored in
+    a separate field and cannot modify evidence, findings or the score.
+    """
+
+    @property
+    def name(self) -> str:
+        return "summary"
+
+    async def execute(self, context: InvestigationContext) -> None:
+        from app.analyst import generate_report
+        snapshot = context.to_result(status="success").model_dump(mode="json")
+        context.analyst_report = generate_report(snapshot).model_dump()

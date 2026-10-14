@@ -102,6 +102,7 @@ class InvestigationContext:
         self.validation_results: Dict[str, Any] = {}
         self.threat_intelligence: Dict[str, Any] = {}
         self.risk_assessment: Optional[Any] = None
+        self.analyst_report: Optional[Dict[str, Any]] = None
 
         # Telemetry & Diagnostics
         self.stage_metrics: List[StageMetric] = []
@@ -215,6 +216,10 @@ class InvestigationContext:
             status=status,
             duration_ms=total_duration_ms,
             pipeline_version="1.0.0",
+            source_type=getattr(self.raw_input.source_type, "value", str(self.raw_input.source_type)),
+            source_name=self.raw_input.metadata.get("filename"),
+            input_preview=(self.raw_input.content or "")[:280],
+            ingestion=self.raw_input.metadata.get("analysis") or {},
             evidence_summary=evidence_summary,
             validation_summary=val_summary,
             threat_summary=threat_summary,
@@ -224,6 +229,7 @@ class InvestigationContext:
             validation_results=serialized_validation,
             threat_intelligence=serialized_intel,
             risk_assessment=risk_dto,
+            analyst_report=self.analyst_report,
             warnings=self.warnings,
             errors=self.errors,
             execution_metrics=self.stage_metrics
