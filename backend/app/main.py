@@ -45,6 +45,11 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS is added last so it is the outermost layer: rate-limit (429) and auth errors
+# still carry CORS headers and reach the browser as readable responses.
 # Configure CORS Middleware
 if settings.CORS_ORIGINS:
     app.add_middleware(
@@ -55,8 +60,6 @@ if settings.CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
 
 # Register API v1 Router
 app.include_router(api_router, prefix=settings.API_V1_STR)

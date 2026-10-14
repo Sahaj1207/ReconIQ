@@ -48,3 +48,13 @@ async def test_capabilities(async_client):
     assert caps["ingestion"]["qr_decoding"] is True
     assert {p["name"] for p in caps["threat_intel"]} >= {"VirusTotal", "AbuseIPDB", "RDAP"}
     assert len(caps["rules"]) == 27
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_response_keeps_cors_headers(async_client, monkeypatch):
+    monkeypatch.setattr(settings, "RATE_LIMIT_PER_MINUTE", 1)
+    headers = {"X-API-Key": "cors-test-client", "Origin": "http://localhost:5173"}
+    await async_client.get("/api/v1/investigations", headers=headers)
+    limited = await async_client.get("/api/v1/investigations", headers=headers)
+    assert limited.status_code == 429
+    assert limited.headers["access-control-allow-origin"] == "http://localhost:5173"

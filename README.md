@@ -91,7 +91,7 @@ codes and fingerprinted.
 ### Tests
 
 ```bash
-cd backend && python -m pytest -q      # 116 tests, fully offline (HTTP providers and Claude are mocked)
+cd backend && python -m pytest -q      # 117 tests, fully offline (HTTP providers and Claude are mocked)
 cd frontend && npm run build           # type-check + production build
 ```
 
@@ -205,7 +205,7 @@ backend/
     reports/            STIX 2.1, Markdown, PDF
     risk_engine/        rules, extended content rules, scorer, confidence, weights
     utils/, validators/ normalizer, regex patterns, validator
-  tests/                116 offline tests
+  tests/                117 offline tests
 frontend/
   src/pages/            Investigate, History, Investigation, System
   src/components/       result panels, input, export menu, …
