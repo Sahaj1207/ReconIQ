@@ -19,12 +19,12 @@ ATT&CK. An AI analyst then explains the result in plain language.
 
 | Area | What ReconIQ does |
 |---|---|
-| **Ingestion** | Text (defanged notation supported), `.eml` emails, PDFs, images (QR decoding, optional OCR), Android APKs, text/log files, and any binary (fingerprint + hash lookup). |
+| **Ingestion** | Text (defanged notation supported), `.eml` and Outlook `.msg` emails, PDFs (including QR codes and OCR text in embedded images), Office documents (VBA macro detection for `.docm`/`.xlsm`/`.doc`/`.xls`, remote-template links), ZIP archives (recursive, with depth, entry-count, size and decompression-bomb limits), images (QR decoding, optional OCR), Android APKs, text/log files, and any binary (fingerprint + hash lookup). |
 | **Indicators** | IPv4/IPv6, URLs (including IP-literal hosts), domains, emails, phone numbers and MD5/SHA-1/SHA-256 hashes — refanged, normalized and validated (RFC checks, TLDs, private/reserved ranges). |
 | **Email analysis** | SPF/DKIM/DMARC verdicts, display name, reply-to and return-path routing, relay IPs, HTML link targets, attachment fingerprints. |
 | **File analysis** | Magic-byte typing, hashes, dangerous-type and extension-mismatch detection, PDF links and active content (`/JavaScript`, `/OpenAction`, `/Launch`…), APK package, permissions and embedded URLs. |
 | **Threat intelligence** | VirusTotal, AbuseIPDB, URLhaus, Google Safe Browsing, Have I Been Pwned (key-based) and Shodan InternetDB and RDAP domain age (keyless). Concurrent, cached and rate-limited, with graceful degradation. |
-| **Risk engine** | 27 deterministic rules → 0–100 score, severity, confidence, primary classification, ranked threat categories, MITRE ATT&CK techniques and CWE references, with a full audit trail. |
+| **Risk engine** | 32 deterministic rules → 0–100 score, severity, confidence, primary classification, ranked threat categories, MITRE ATT&CK techniques and CWE references, with a full audit trail. |
 | **AI analyst** | Claude writes an executive summary, key findings and recommended actions when `ANTHROPIC_API_KEY` is set; otherwise a deterministic template does. |
 | **Reports** | PDF and Markdown (indicators defanged), STIX 2.1 bundles (observables, indicators, attack-patterns, relationships, report) and raw JSON. |
 | **History** | Every investigation is stored (SQLite by default, PostgreSQL supported) with search, severity filters and dashboard statistics. |
@@ -37,7 +37,7 @@ ATT&CK. An AI analyst then explains the result in plain language.
 
 ```
 Input ─► Ingestion ─► Evidence collection ─► Normalization ─► Validation ─► Threat intel ─► Risk engine ─► AI analyst
-(text,   (parsers:     (IOC extractor +       (refang,          (RFC/TLD/     (7 providers,   (27 rules,     (explains;
+(text,   (parsers:     (IOC extractor +       (refang,          (RFC/TLD/     (7 providers,   (32 rules,     (explains;
  files)   eml, pdf,     seeded file hashes)    canonicalize)     scope checks)  concurrent)     ATT&CK, CWE)   never scores)
           qr, apk)
                                                                                                  │
@@ -182,10 +182,15 @@ Scores are the capped sum of matched rule weights. Severity bands: 0–19 Inform
 | RULE_EML_001 | Email Authentication Failure | HIGH | 50 |
 | RULE_EML_002 | Reply-To / Return-Path Mismatch | MEDIUM | 25 |
 | RULE_EML_003 | Display Name Spoofing | MEDIUM | 25 |
+| RULE_EML_004 | Deceptive Link Text | HIGH | 50 |
 | RULE_FIL_001 | Dangerous File or Attachment | HIGH | 50 |
 | RULE_FIL_002 | QR Code Leading to URL | MEDIUM | 25 |
 | RULE_FIL_003 | Android App With Dangerous Permissions | HIGH | 50 |
 | RULE_FIL_004 | PDF Active Content | HIGH | 50 |
+| RULE_FIL_005 | Office Document Contains VBA Macros | MEDIUM | 25 |
+| RULE_FIL_006 | Auto-Executing Macro With Suspicious Calls | CRITICAL | 80 |
+| RULE_FIL_007 | Archive Conceals Risky Content | HIGH | 50 |
+| RULE_FIL_008 | QR Code Link Inside PDF | MEDIUM | 25 |
 
 A provider result counts as a malicious verdict only when the lookup succeeded **and** returned a MEDIUM-or-higher
 threat indicator; provider confidence alone never flags an artifact.
@@ -220,6 +225,7 @@ docker-compose.yml      Postgres + API + dashboard
 
 ## Known limitations
 
-- Outlook `.msg` files aren't parsed; save them as `.eml`.
+- Outlook `.msg` bodies stored only as compressed RTF aren't decoded (plain-text and HTML bodies are), and embedded message attachments aren't opened.
+- Only ZIP archives are opened; 7z and RAR are fingerprinted only, and password-protected entries are flagged, never decrypted.
 - Rate limiting and provider caches are in-process; multi-replica deployments should move them to a shared store.
-- No user accounts or multi-tenancy: access control is shared API keys.
+- Accounts are single-tenant: every signed-in user can see every investigation (deletion is limited to owners and admins).

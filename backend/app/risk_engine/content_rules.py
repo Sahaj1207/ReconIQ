@@ -409,6 +409,46 @@ class DisplayNameSpoofRule(_Rule):
         return False, [], {}
 
 
+# Click-tracking and link-protection services legitimately rewrite every link's target
+LINK_REWRITERS = {
+    "list-manage.com", "sendgrid.net", "mandrillapp.com", "mcsv.net", "hubspotlinks.com", "hs-sites.com",
+    "outlook.com", "urldefense.com", "proofpoint.com", "mimecast.com", "mimecastprotect.com", "rs6.net",
+    "exacttarget.com", "mktomail.com", "awstrack.me", "google.com", "t.co",
+}
+
+
+class DeceptiveLinkTextRule(_Rule):
+    def __init__(self) -> None:
+        super().__init__(
+            "RULE_EML_004", "Deceptive Link Text",
+            "An email link displays one web address but actually points to a different domain",
+            RiskWeights.HIGH, "HIGH",
+            categories=["phishing_email", "credential_harvesting"], mitre=["T1566.002", "T1036"], cwe=["CWE-451"],
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> RuleResult:
+        email = (context.get("ingestion") or {}).get("email") or {}
+        mismatches = []
+        for pair in email.get("link_texts") or []:
+            text = pair.get("text", "")
+            shown = urllib.parse.urlsplit(text if "://" in text else f"http://{text}").hostname
+            actual = urllib.parse.urlsplit(pair.get("href", "")).hostname
+            if not shown or not actual:
+                continue
+            shown_dom, actual_dom = registrable_domain(shown), registrable_domain(actual)
+            if shown_dom != actual_dom and actual_dom not in LINK_REWRITERS:
+                mismatches.append({"shown": text, "actual": pair["href"]})
+        if mismatches:
+            first = mismatches[0]
+            return True, [self.finding(
+                "Link Text Disguises Destination",
+                f"Link shows '{first['shown']}' but opens {first['actual']}"
+                + (f" (+{len(mismatches) - 1} more)" if len(mismatches) > 1 else ""),
+                first["actual"],
+            )], {"mismatches": mismatches}
+        return False, [], {}
+
+
 # --- File Rules ---
 
 class DangerousFileTypeRule(_Rule):
@@ -488,6 +528,99 @@ class PDFActiveContentRule(_Rule):
         return False, [], {}
 
 
+class OfficeMacroRule(_Rule):
+    def __init__(self) -> None:
+        super().__init__(
+            "RULE_FIL_005", "Office Document Contains VBA Macros",
+            "An Office document (submitted, attached or inside an archive) carries a VBA macro project",
+            RiskWeights.MEDIUM, "MEDIUM",
+            categories=["malware_distribution"], mitre=["T1566.001", "T1059.005"], cwe=["CWE-506"],
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> RuleResult:
+        macros = (context.get("ingestion") or {}).get("macros") or []
+        if macros:
+            files = [m.get("file") for m in macros]
+            modules = sorted({mod for m in macros for mod in m.get("modules", [])})
+            detail = f" (modules: {', '.join(modules[:5])})" if modules else ""
+            return True, [self.finding("Macro-Enabled Document", f"VBA macros found in {', '.join(files[:3])}{detail}",
+                                       files[0])], {"files": files, "modules": modules}
+        return False, [], {}
+
+
+# Macro behaviours that, combined with an auto-run entry point, indicate a dropper
+DROPPER_BEHAVIOURS = ("shell execution", "download", "file write", "native API", "object creation")
+
+
+class AutoExecMacroRule(_Rule):
+    def __init__(self) -> None:
+        super().__init__(
+            "RULE_FIL_006", "Auto-Executing Macro With Suspicious Calls",
+            "A macro runs automatically on open/close and calls shell, download, file-write or native APIs",
+            RiskWeights.CRITICAL, "CRITICAL",
+            categories=["malware_distribution"], mitre=["T1204.002", "T1059.005", "T1137", "T1105"], cwe=["CWE-506"],
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> RuleResult:
+        for m in (context.get("ingestion") or {}).get("macros") or []:
+            calls = [s for s in m.get("suspicious", []) if s.split(":", 1)[0] in DROPPER_BEHAVIOURS]
+            if m.get("autoexec") and calls:
+                return True, [self.finding(
+                    "Auto-Run Macro Dropper Behaviour",
+                    f"{m.get('file')}: {', '.join(m['autoexec'][:2])} runs automatically and uses "
+                    f"{', '.join(c.split(': ', 1)[1] for c in calls[:4])}",
+                    m.get("file"),
+                )], {"file": m.get("file"), "autoexec": m["autoexec"], "calls": calls}
+        return False, [], {}
+
+
+class ArchiveConcealmentRule(_Rule):
+    def __init__(self) -> None:
+        super().__init__(
+            "RULE_FIL_007", "Archive Conceals Risky Content",
+            "A ZIP archive holds executables or scripts, password-protected entries, or a decompression bomb",
+            RiskWeights.HIGH, "HIGH",
+            categories=["malware_distribution"], mitre=["T1027.015", "T1566.001", "T1204.002"], cwe=["CWE-506"],
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> RuleResult:
+        reasons, details = [], {"dangerous": [], "encrypted": [], "limits": []}
+        for archive in (context.get("ingestion") or {}).get("archives") or []:
+            details["dangerous"] += [f"{archive['path']}/{n}" for n in archive.get("dangerous", [])]
+            details["encrypted"] += [f"{archive['path']}/{n}" for n in archive.get("encrypted", [])]
+            details["limits"] += [r for r in archive.get("limits_exceeded", [])
+                                  if "bomb" in r or "nested" in r]
+        if details["dangerous"]:
+            reasons.append(f"risky file(s) inside: {', '.join(details['dangerous'][:3])}")
+        if details["encrypted"]:
+            reasons.append(f"{len(details['encrypted'])} password-protected entr{'y' if len(details['encrypted']) == 1 else 'ies'} "
+                           "that scanners cannot inspect")
+        if details["limits"]:
+            reasons.append("; ".join(sorted(set(details["limits"]))))
+        if reasons:
+            target = (details["dangerous"] or details["encrypted"] or [None])[0]
+            return True, [self.finding("Archive Hides Risky Content", "Archive " + "; ".join(reasons), target)], details
+        return False, [], {}
+
+
+class PDFQRCodeRule(_Rule):
+    def __init__(self) -> None:
+        super().__init__(
+            "RULE_FIL_008", "QR Code Link Inside PDF",
+            "An image embedded in a PDF contains a QR code that encodes a web link",
+            RiskWeights.MEDIUM, "MEDIUM",
+            categories=["qr_phishing"], mitre=["T1566.001", "T1204.001"],
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> RuleResult:
+        pdf = ((context.get("ingestion") or {}).get("file") or {}).get("pdf") or {}
+        payloads = (pdf.get("images") or {}).get("qr_payloads") or []
+        links = [p for p in payloads if re.match(r"(?i)^(https?://|www\.)", p.strip())]
+        if links:
+            return True, [self.finding("QR-Encoded Link in PDF", f"PDF image QR code resolves to {links[0]}", links[0])], {"qr_links": links}
+        return False, [], {}
+
+
 # --- Intel Context Rules ---
 
 class NewlyRegisteredDomainRule(_Rule):
@@ -527,9 +660,14 @@ EXTENDED_RULES = [
     EmailAuthenticationFailureRule,
     ReplyToMismatchRule,
     DisplayNameSpoofRule,
+    DeceptiveLinkTextRule,
     DangerousFileTypeRule,
     QRCodeURLRule,
     APKDangerousPermissionsRule,
     PDFActiveContentRule,
+    OfficeMacroRule,
+    AutoExecMacroRule,
+    ArchiveConcealmentRule,
+    PDFQRCodeRule,
     NewlyRegisteredDomainRule,
 ]

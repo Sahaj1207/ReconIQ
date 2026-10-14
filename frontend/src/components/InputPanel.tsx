@@ -20,7 +20,7 @@ interface Props {
 }
 
 const MAX_CHARS = 500_000;
-const ACCEPT = ".eml,.pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.apk,.txt,.log,.csv,.json,.html,.htm,.exe,.zip,.docm,.xlsm,*/*";
+const ACCEPT = ".eml,.msg,.pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.apk,.txt,.log,.csv,.json,.html,.htm,.exe,.zip,.doc,.docx,.docm,.xls,.xlsx,.xlsm,.pptm,*/*";
 
 export function InputPanel(props: Props) {
   const { mode, text, file, refang, loading, maxUploadMb } = props;
@@ -156,7 +156,7 @@ function FileInput({ file, onFileChange, maxUploadMb }: Props) {
         <FileUp className="h-7 w-7 text-accent" />
         <div className="text-sm font-medium">Drop a file or click to browse</div>
         <div className="max-w-xs text-[12px] text-ink-faint">
-          Emails (.eml), PDFs, screenshots and QR images, Android APKs, logs — or any binary to fingerprint and hash-check.
+          Emails (.eml, .msg), PDFs, Office documents (macro scan), ZIP archives, screenshots and QR images, Android APKs, logs — or any binary to fingerprint and hash-check.
         </div>
         <input
           ref={inputRef}

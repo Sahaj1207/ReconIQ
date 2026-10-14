@@ -43,7 +43,7 @@ def capabilities(_: Principal = Depends(require_role("viewer"))) -> Dict[str, An
             "max_upload_mb": settings.MAX_UPLOAD_MB,
             "qr_decoding": _qr_available(),
             "ocr": ocr_available(),
-            "file_types": ["eml", "pdf", "png", "jpg", "gif", "webp", "bmp", "apk", "txt", "log", "csv", "json", "html", "any binary (hash only)"],
+            "file_types": ["eml", "msg", "pdf", "zip", "docx/docm/xlsx/xlsm/pptm", "doc/xls (OLE)", "png", "jpg", "gif", "webp", "bmp", "apk", "txt", "log", "csv", "json", "html", "any binary (hash only)"],
         },
         "threat_intel": provider_status(),
         "rules": [{"id": r.id, "name": r.name, "severity": r.severity, "weight": r.weight, "enabled": r.enabled} for r in rules],

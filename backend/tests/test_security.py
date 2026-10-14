@@ -48,7 +48,7 @@ async def test_capabilities(async_client):
     assert caps["analyst"]["mode"] == "template"
     assert caps["ingestion"]["qr_decoding"] is True
     assert {p["name"] for p in caps["threat_intel"]} >= {"VirusTotal", "AbuseIPDB", "RDAP"}
-    assert len(caps["rules"]) == 27
+    assert len(caps["rules"]) == 32
 
 
 @pytest.mark.asyncio

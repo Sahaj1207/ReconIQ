@@ -140,7 +140,15 @@ export interface FileAnalysis {
   extension_mismatch?: boolean;
   qr_payloads?: string[];
   ocr?: { available: boolean; characters: number; note?: string; error?: string };
-  pdf?: { pages: number; metadata: Record<string, string>; links: string[]; active_content: string[]; error?: string };
+  pdf?: {
+    pages: number;
+    metadata: Record<string, string>;
+    links: string[];
+    active_content: string[];
+    images?: { scanned: number; qr_payloads: string[]; ocr_characters: number; truncated?: boolean };
+    error?: string;
+  };
+  office?: { format?: "ooxml" | "ole"; external_links: string[] };
   apk?: {
     package: string | null;
     permissions: string[];
@@ -165,12 +173,38 @@ export interface EmailAnalysis {
   authentication: Record<string, string>;
   received_ips: string[];
   links: string[];
+  link_texts?: { text: string; href: string }[];
+  format?: "msg";
   attachments: (FileAnalysis & { content_type: string })[];
+}
+
+export interface MacroAnalysis {
+  file: string;
+  present: boolean;
+  modules: string[];
+  autoexec: string[];
+  suspicious: string[];
+  notes?: string[];
+  error?: string;
+}
+
+export interface ArchiveAnalysis {
+  path: string;
+  depth: number;
+  entries: number;
+  members: { name: string; size: number; kind?: string; dangerous?: boolean; encrypted?: boolean }[];
+  encrypted: string[];
+  dangerous: string[];
+  nested_archives: number;
+  limits_exceeded: string[];
+  error?: string;
 }
 
 export interface IngestionAnalysis {
   file?: FileAnalysis;
   email?: EmailAnalysis;
+  macros?: MacroAnalysis[];
+  archives?: ArchiveAnalysis[];
 }
 
 export interface RiskSummary {

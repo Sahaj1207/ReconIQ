@@ -1,5 +1,5 @@
-import { CheckCircle2, FileSearch, Mail, Paperclip, QrCode, ShieldAlert, Smartphone, XCircle } from "lucide-react";
-import type { EmailAnalysis, FileAnalysis, IngestionAnalysis } from "../lib/types";
+import { Archive, CheckCircle2, FileCode2, FileSearch, Lock, Mail, Paperclip, QrCode, ShieldAlert, Smartphone, XCircle } from "lucide-react";
+import type { ArchiveAnalysis, EmailAnalysis, FileAnalysis, IngestionAnalysis, MacroAnalysis } from "../lib/types";
 import { formatBytes } from "../lib/format";
 import { CopyButton } from "./CopyButton";
 
@@ -8,11 +8,87 @@ const AUTH_BAD = new Set(["fail", "softfail", "permerror", "hardfail"]);
 
 export function ArtifactAnalysis({ ingestion }: { ingestion: IngestionAnalysis }) {
   if (!ingestion?.email && !ingestion?.file) return null;
+  const embedded = Boolean(ingestion.macros?.length || ingestion.archives?.length);
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       {ingestion.email && <EmailPanel email={ingestion.email} />}
       {ingestion.file && <FilePanel file={ingestion.file} compact={Boolean(ingestion.email)} />}
+      {embedded && <EmbeddedPanel macros={ingestion.macros ?? []} archives={ingestion.archives ?? []} />}
     </div>
+  );
+}
+
+function EmbeddedPanel({ macros, archives }: { macros: MacroAnalysis[]; archives: ArchiveAnalysis[] }) {
+  return (
+    <section className="card xl:col-span-2">
+      <div className="card-header">
+        <h2 className="card-title">
+          <FileCode2 className="h-4 w-4 text-accent" />
+          Macros &amp; embedded files
+        </h2>
+      </div>
+      <div className="grid gap-5 p-5 lg:grid-cols-2">
+        {macros.length > 0 && (
+          <div className="space-y-3">
+            {macros.map((m) => (
+              <div key={m.file} className="rounded-lg border border-line p-3" data-testid="macro">
+                <div className="flex items-center gap-2 font-mono text-[12.5px]">
+                  <span className="truncate">{m.file}</span>
+                  {m.autoexec.length > 0 && <span className="chip bg-fail/12 text-fail">auto-run</span>}
+                </div>
+                <p className="mt-1 text-[12px] text-ink-muted">
+                  VBA project{m.modules.length ? ` · modules: ${m.modules.join(", ")}` : ""}
+                  {m.autoexec.length ? ` · entry points: ${m.autoexec.join(", ")}` : ""}
+                </p>
+                {m.suspicious.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {m.suspicious.map((s) => (
+                      <span key={s} className="chip bg-fail/12 font-mono text-fail">{s}</span>
+                    ))}
+                  </div>
+                )}
+                {[...(m.notes ?? []), ...(m.error ? [m.error] : [])].map((n) => (
+                  <p key={n} className="mt-1 text-[11.5px] text-ink-faint">{n}</p>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+        {archives.length > 0 && (
+          <div className="space-y-3">
+            {archives.map((a) => (
+              <div key={a.path} className="rounded-lg border border-line p-3" data-testid="archive">
+                <div className="flex items-center gap-2 font-mono text-[12.5px]">
+                  <Archive className="h-3.5 w-3.5 shrink-0 text-ink-faint" />
+                  <span className="truncate">{a.path}</span>
+                </div>
+                <p className="mt-1 text-[12px] text-ink-muted">
+                  {a.entries} entr{a.entries === 1 ? "y" : "ies"}
+                  {a.nested_archives ? ` · ${a.nested_archives} nested archive(s)` : ""}
+                  {a.encrypted.length ? ` · ${a.encrypted.length} password-protected` : ""}
+                </p>
+                {a.members.length > 0 && (
+                  <ul className="mt-2 max-h-48 space-y-0.5 overflow-auto text-[12px]">
+                    {a.members.map((m) => (
+                      <li key={m.name} className="flex items-center gap-2">
+                        {m.encrypted ? <Lock className="h-3 w-3 shrink-0 text-sev-high" /> : null}
+                        <span className={`truncate font-mono ${m.dangerous || a.dangerous.includes(m.name) ? "text-fail" : ""}`}>
+                          {m.name}
+                        </span>
+                        <span className="ml-auto shrink-0 text-ink-faint">{formatBytes(m.size)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {a.limits_exceeded.map((r) => (
+                  <p key={r} className="mt-1 text-[11.5px] text-sev-high">{r}</p>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -157,6 +233,18 @@ function FilePanel({ file, compact }: { file: FileAnalysis; compact: boolean }) 
             ) : (
               <p className="text-[12px] text-ok">No JavaScript, launch or auto-open actions.</p>
             )}
+            {file.pdf.images && file.pdf.images.scanned > 0 && (
+              <p className="text-[12px] text-ink-muted">
+                {file.pdf.images.scanned} embedded image(s) scanned
+                {file.pdf.images.ocr_characters ? ` · ${file.pdf.images.ocr_characters} OCR characters` : ""}
+              </p>
+            )}
+            {file.pdf.images?.qr_payloads.map((p) => (
+              <div key={p} className="flex items-start gap-2 break-all rounded-md border border-line bg-canvas/40 px-3 py-2 font-mono text-[12px]">
+                <QrCode className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sev-high" />
+                {p}
+              </div>
+            ))}
           </SubSection>
         )}
 
