@@ -4,6 +4,7 @@ export type Route =
   | { page: "investigate" }
   | { page: "history" }
   | { page: "system" }
+  | { page: "admin"; tab: "users" | "audit" }
   | { page: "investigation"; id: string };
 
 function parse(hash: string): Route {
@@ -12,6 +13,8 @@ function parse(hash: string): Route {
   if (match) return { page: "investigation", id: match[1] };
   if (path === "/history") return { page: "history" };
   if (path === "/system") return { page: "system" };
+  if (path === "/admin") return { page: "admin", tab: "users" };
+  if (path === "/admin/audit") return { page: "admin", tab: "audit" };
   return { page: "investigate" };
 }
 

@@ -3,10 +3,12 @@ import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import { deleteInvestigation, getInvestigation } from "../lib/api";
 import type { Capabilities, InvestigationResult } from "../lib/types";
 import { ResultView } from "../components/ResultView";
+import { useAuth } from "../lib/auth";
 
 export function InvestigationPage({ id, caps }: { id: string; caps: Capabilities | null }) {
   const [result, setResult] = useState<InvestigationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { me, can } = useAuth();
 
   useEffect(() => {
     setResult(null);
@@ -30,7 +32,7 @@ export function InvestigationPage({ id, caps }: { id: string; caps: Capabilities
         <a href="#/history" className="btn-ghost -ml-2 text-xs">
           <ArrowLeft className="h-3.5 w-3.5" /> History
         </a>
-        {result && (
+        {result && (can("admin") || (can("analyst") && (me?.kind !== "user" || result.owner_id === me?.user?.id))) && (
           <button type="button" onClick={remove} className="btn-ghost text-xs hover:text-fail">
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </button>

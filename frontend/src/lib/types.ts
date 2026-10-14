@@ -189,6 +189,8 @@ export interface InvestigationResult {
   errors: string[];
   execution_metrics: StageMetric[];
   timestamp: string;
+  owner_id?: string | null;
+  owner_email?: string | null;
 }
 
 export interface InvestigationRequest {
@@ -216,6 +218,8 @@ export interface InvestigationSummary {
   severity: Severity;
   classification: string;
   ioc_count: number;
+  owner_id: string | null;
+  owner_email: string | null;
 }
 
 export interface InvestigationList {
@@ -253,3 +257,48 @@ export interface Capabilities {
 }
 
 export type ReportFormat = "json" | "stix" | "markdown" | "pdf";
+
+export type Role = "viewer" | "analyst" | "admin";
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  is_active: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface Session {
+  access_token: string;
+  token_type: string;
+  expires_at: string;
+  user: User;
+}
+
+export interface AuthConfig {
+  auth_required: boolean;
+  signup_open: boolean;
+  signup_role: string;
+  min_password_length: number;
+}
+
+export interface Me {
+  kind: "user" | "api_key" | "local";
+  role: Role;
+  email: string | null;
+  user: User | null;
+}
+
+export interface AuditEvent {
+  id: number;
+  created_at: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  detail: Record<string, unknown>;
+  ip: string | null;
+}

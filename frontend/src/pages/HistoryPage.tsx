@@ -4,6 +4,7 @@ import { getStats, listInvestigations } from "../lib/api";
 import type { InvestigationList, InvestigationStats, Severity } from "../lib/types";
 import { SEVERITY_ORDER, SOURCE_LABELS, formatRelativeTime, severityStyle, titleCase } from "../lib/format";
 import { SeverityBadge } from "../components/SeverityBadge";
+import { useAuth } from "../lib/auth";
 
 const PAGE = 20;
 
@@ -14,7 +15,10 @@ export function HistoryPage() {
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState<Severity | "">("");
   const [offset, setOffset] = useState(0);
+  const [mine, setMine] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { me } = useAuth();
+  const signedIn = me?.kind === "user";
 
   useEffect(() => {
     getStats().then(setStats).catch((e) => setError(e.message));
@@ -30,10 +34,10 @@ export function HistoryPage() {
   }, [q]);
 
   useEffect(() => {
-    listInvestigations({ limit: PAGE, offset, severity, q: query })
+    listInvestigations({ limit: PAGE, offset, severity, q: query, mine: mine || undefined })
       .then(setList)
       .catch((e) => setError(e.message));
-  }, [offset, severity, query]);
+  }, [offset, severity, query, mine]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -48,6 +52,16 @@ export function HistoryPage() {
             {list && <span className="rounded-full bg-surface-2 px-2 text-[11px] font-medium text-ink-muted">{list.total}</span>}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
+            {signedIn && (
+              <div className="flex rounded-lg border border-line p-0.5 text-[11px]">
+                {[{ v: false, label: "Everyone" }, { v: true, label: "Mine" }].map((o) => (
+                  <button key={o.label} type="button" onClick={() => { setMine(o.v); setOffset(0); }}
+                    className={`rounded-md px-2.5 py-1 font-medium ${mine === o.v ? "bg-surface-2 text-ink" : "text-ink-faint hover:text-ink-muted"}`}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <select
               value={severity}
               onChange={(e) => { setSeverity(e.target.value as Severity | ""); setOffset(0); }}
@@ -88,6 +102,7 @@ export function HistoryPage() {
                     <th className="px-3 py-2.5 font-medium">Subject</th>
                     <th className="px-3 py-2.5 font-medium">Classification</th>
                     <th className="px-3 py-2.5 font-medium">Source</th>
+                    {signedIn && <th className="px-3 py-2.5 font-medium">Analyst</th>}
                     <th className="px-3 py-2.5 text-right font-medium">IOCs</th>
                     <th className="px-5 py-2.5 text-right font-medium">When</th>
                   </tr>
@@ -112,6 +127,7 @@ export function HistoryPage() {
                       </td>
                       <td className="px-3 py-2.5 text-ink-muted">{item.classification === "no_threat_identified" ? "—" : titleCase(item.classification)}</td>
                       <td className="px-3 py-2.5 text-ink-muted">{SOURCE_LABELS[item.source_type] ?? item.source_type}</td>
+                      {signedIn && <td className="max-w-[160px] truncate px-3 py-2.5 text-ink-faint">{item.owner_email ?? "—"}</td>}
                       <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-muted">{item.ioc_count}</td>
                       <td className="whitespace-nowrap px-5 py-2.5 text-right text-ink-faint" title={new Date(item.created_at).toLocaleString()}>
                         {formatRelativeTime(item.created_at)}
