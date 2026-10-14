@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     LOG_LEVEL: str = "INFO"
 
+    # Upload limits
+    MAX_UPLOAD_MB: int = 15
+
     # CORS Configuration
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",

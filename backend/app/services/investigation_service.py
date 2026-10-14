@@ -60,3 +60,7 @@ class InvestigationService:
         else:
             req = payload
         return await self.pipeline.run(req)
+
+    async def investigate_ingested(self, ingested: IngestedInput) -> InvestigationResult:
+        """Runs the pipeline on an already-parsed IngestedInput (file uploads)."""
+        return await self.pipeline.run(ingested)

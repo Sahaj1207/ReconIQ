@@ -57,6 +57,10 @@ class IOCExtractor(BaseExtractor):
             IngestionSourceType.EMAIL,
             IngestionSourceType.OCR_TEXT,
             IngestionSourceType.BROWSER_UPLOAD,
+            IngestionSourceType.PDF_FILE,
+            IngestionSourceType.QR_CODE,
+            IngestionSourceType.IMAGE,
+            IngestionSourceType.APK_FILE,
         ]
 
     def extract(self, input_data: IngestedInput) -> Dict[str, List[str]]:

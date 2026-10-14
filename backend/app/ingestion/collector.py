@@ -140,6 +140,11 @@ class EvidenceCollector:
                     exc_info=True
                 )
 
+        # Merge indicators seeded by ingestion parsers (e.g. the uploaded file's own hashes)
+        seeds = input_data.metadata.get("seed_indicators") or {}
+        merged_hashes.update(h.lower() for h in seeds.get("hashes", []))
+        merged_urls.update(seeds.get("urls", []))
+
         # Build final deterministic Pydantic DTOs
         results = IOCResults(
             ipv4=sorted(list(merged_ipv4)),
