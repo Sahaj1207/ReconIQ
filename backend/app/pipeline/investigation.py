@@ -39,7 +39,7 @@ from app.pipeline.steps import (
     ValidationStep,
     ThreatIntelStep,
     RiskAssessmentStep,
-    AIAnalystStep
+    SummaryStep
 )
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class InvestigationPipeline:
                 ValidationStep(),
                 ThreatIntelStep(),
                 RiskAssessmentStep(),
-                AIAnalystStep(),
+                SummaryStep(),
             ]
 
     @property

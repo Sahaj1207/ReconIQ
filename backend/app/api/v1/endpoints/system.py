@@ -9,7 +9,6 @@ from typing import Any, Dict
 from fastapi import APIRouter
 
 from app import __version__
-from app.analyst import analyst_mode, analyst_model
 from app.core.config import settings
 from app.auth.principal import Principal, auth_required, require_role
 from fastapi import Depends
@@ -38,7 +37,6 @@ def capabilities(_: Principal = Depends(require_role("viewer"))) -> Dict[str, An
         "signup_role": settings.SIGNUP_ROLE,
         "rate_limit_per_minute": settings.RATE_LIMIT_PER_MINUTE,
         "persistence": settings.PERSIST_INVESTIGATIONS,
-        "analyst": {"mode": analyst_mode(), "model": analyst_model()},
         "ingestion": {
             "max_upload_mb": settings.MAX_UPLOAD_MB,
             "qr_decoding": _qr_available(),

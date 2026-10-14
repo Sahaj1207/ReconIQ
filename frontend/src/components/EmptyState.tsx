@@ -15,8 +15,7 @@ export function EmptyState() {
       </div>
       <h2 className="mt-4 text-lg font-semibold">Start an investigation</h2>
       <p className="mt-1 max-w-md text-sm text-ink-muted">
-        Paste suspicious content on the left, or load a sample. Every verdict is produced by deterministic rules — never by
-        an AI model.
+        Paste suspicious content on the left, or load a sample. Every verdict is produced by fixed, auditable rules.
       </p>
       <div className="mt-8 grid w-full max-w-3xl gap-3 text-left sm:grid-cols-2">
         {STEPS.map(({ icon: Icon, title, text }, i) => (

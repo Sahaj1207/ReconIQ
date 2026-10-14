@@ -169,9 +169,9 @@ class RiskAssessmentStep(BasePipelineStep):
         context.risk_assessment = assessment
 
 
-class AIAnalystStep(BasePipelineStep):
+class SummaryStep(BasePipelineStep):
     """
-    Step 6: AI Analyst narrative.
+    Step 6: Analyst summary.
 
     Runs after scoring and reads a snapshot of the finished assessment. Its output is stored in
     a separate field and cannot modify evidence, findings or the score.
@@ -179,10 +179,9 @@ class AIAnalystStep(BasePipelineStep):
 
     @property
     def name(self) -> str:
-        return "ai_analyst"
+        return "summary"
 
     async def execute(self, context: InvestigationContext) -> None:
         from app.analyst import generate_report
         snapshot = context.to_result(status="success").model_dump(mode="json")
-        report = await generate_report(snapshot)
-        context.analyst_report = report.model_dump()
+        context.analyst_report = generate_report(snapshot).model_dump()

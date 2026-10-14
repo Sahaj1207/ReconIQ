@@ -2,7 +2,7 @@ import { CheckCircle2, CircleDashed, Loader2, Workflow, XCircle } from "lucide-r
 import type { StageMetric } from "../lib/types";
 import { STAGE_LABELS, formatMs } from "../lib/format";
 
-const DEFAULT_STAGES = ["evidence_collection", "normalization", "validation", "threat_intelligence", "risk_assessment", "ai_analyst"];
+const DEFAULT_STAGES = ["evidence_collection", "normalization", "validation", "threat_intelligence", "risk_assessment", "summary"];
 
 const FINISHED = new Set(["COMPLETED", "FAILED", "SKIPPED"]);
 

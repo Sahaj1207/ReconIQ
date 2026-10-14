@@ -6,14 +6,14 @@ Provides test client fixtures and sample threat intelligence payload samples for
 
 import os
 
-# Keep the test suite offline: no keyless intel calls, no provider or LLM keys.
+# Keep the test suite offline: no keyless intel calls, no provider keys.
 os.environ["INTEL_KEYLESS_PROVIDERS"] = "false"
 # TEST_DATABASE_URL runs the suite against a real server, e.g. postgresql://user@localhost/reconiq_test
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "sqlite://")
 os.environ["RATE_LIMIT_PER_MINUTE"] = "0"
 os.environ["API_KEYS"] = ""
 for _key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "URLHAUS_AUTH_KEY", "GOOGLE_SAFE_BROWSING_API_KEY",
-             "HIBP_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"):
+             "HIBP_API_KEY"):
     os.environ[_key] = ""
 
 import pytest

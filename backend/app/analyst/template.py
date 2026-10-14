@@ -1,8 +1,7 @@
 """
 Deterministic narrative generator.
 
-Always available; used directly when no LLM is configured and as the fallback whenever the
-model call fails or declines.
+Builds the analyst summary shown on every investigation from the scored evidence alone.
 """
 
 from typing import Any, Dict, List

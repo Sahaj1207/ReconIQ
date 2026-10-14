@@ -18,7 +18,8 @@ export const STAGE_LABELS: Record<string, string> = {
   validation: "Validation",
   threat_intelligence: "Threat intelligence",
   risk_assessment: "Risk assessment",
-  ai_analyst: "AI analyst",
+  summary: "Summary",
+  ai_analyst: "Summary", // stage name in investigations saved before the AI analyst was removed
 };
 
 export const SEVERITY_ORDER: Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"];

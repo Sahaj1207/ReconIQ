@@ -20,7 +20,7 @@ from app.pipeline.investigation import InvestigationPipeline
 from app.pipeline.models import StageStatus
 
 PHISH = "URGENT: account suspended. Verify your password at hxxps://paypal-account-security[.]xyz/signin"
-STAGES = ["evidence_collection", "normalization", "validation", "threat_intelligence", "risk_assessment", "ai_analyst"]
+STAGES = ["evidence_collection", "normalization", "validation", "threat_intelligence", "risk_assessment", "summary"]
 
 
 @pytest.mark.asyncio

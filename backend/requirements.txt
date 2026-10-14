@@ -12,7 +12,6 @@ opencv-python-headless>=4.9.0
 pillow>=10.0.0
 # Optional OCR: also requires the tesseract-ocr system package
 pytesseract>=0.3.10
-anthropic>=1.13.0
 sqlalchemy>=2.0.25
 alembic>=1.13.0
 PyJWT>=2.8.0

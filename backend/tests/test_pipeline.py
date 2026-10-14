@@ -51,7 +51,7 @@ async def test_successful_full_investigation():
         "validation",
         "threat_intelligence",
         "risk_assessment",
-        "ai_analyst"
+        "summary"
     ]
     assert all(m.status == StageStatus.COMPLETED for m in result.execution_metrics)
 
