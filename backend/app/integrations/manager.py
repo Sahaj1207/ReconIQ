@@ -144,7 +144,9 @@ class ThreatIntelManager:
         )
 
         # Launch lookups concurrently via asyncio.gather with return_exceptions=True
-        tasks = [p.lookup(artifact, artifact_type) for p in supporting_providers]
+        # Providers expect singular types (e.g. "url"), not pipeline categories ("urls").
+        provider_type = self._normalize_type(artifact_type)
+        tasks = [p.lookup(artifact, provider_type) for p in supporting_providers]
         raw_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         responses: List[ThreatIntelResponse] = []

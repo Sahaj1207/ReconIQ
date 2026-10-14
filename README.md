@@ -130,6 +130,20 @@ uvicorn app.main:app --reload --port 8000
 pytest
 ```
 
+### 5. Start the Analyst Dashboard (frontend)
+Requires Node.js 18+. With the backend running on port 8000:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open `http://localhost:5173`. The Vite dev server proxies `/api` to `http://localhost:8000`
+(override with `VITE_API_PROXY`). For a deployed build, set `VITE_API_BASE_URL` and run `npm run build`.
+
+The dashboard lets you paste or load sample evidence and shows the risk score and severity,
+per-stage pipeline timing, findings, the full rule audit trail, every extracted indicator with
+its validation properties and threat-intel status, plus JSON export and local investigation history.
+
 ---
 
 ## 🔍 API Usage Example
@@ -171,12 +185,22 @@ pytest
 
 ---
 
-## 📌 Roadmap & Future Integrations
+## 📌 Roadmap & Status
 
-- [ ] **Ingestion Layer**: OCR, QR Code decoding, raw email `.eml`/`.msg` header parser, PDF & file metadata extractors.
-- [ ] **Threat Intel Integrations**: VirusTotal, AbuseIPDB, Shodan, WHOIS, Google Safe Browsing, PhishTank, HIBP.
-- [ ] **Risk Engine**: Rule matching engine, dynamic weight assignment, confidence score aggregation.
-- [ ] **Knowledge Base**: Full MITRE ATT&CK (v14) matrix mappings, CWE lookup, standardized threat taxonomy.
+**Done**
+- [x] IOC extraction (IPv4/IPv6, URLs, domains, emails, phone numbers) with defang/refang normalization
+- [x] Structural validators (RFC IP checks, TLD verification, private/reserved classification)
+- [x] Pipeline orchestrator with per-stage isolation, telemetry and secret sanitization
+- [x] Threat-intel framework (provider base class, manager, caching, rate limiting) + VirusTotal provider
+- [x] Deterministic risk engine: 9 rules, weighted scoring, severity mapping, confidence engine
+- [x] REST API: `/health`, `/evidence/extract`, `/evidence/investigate`
+- [x] React analyst dashboard (`frontend/`)
+
+**Pending**
+- [ ] **Ingestion Layer**: OCR, QR Code decoding, raw email `.eml`/`.msg` header parser, PDF & file metadata extractors (source types are declared but only raw text is handled; no file-upload endpoint yet).
+- [ ] **More Threat Intel Providers**: AbuseIPDB, Shodan, WHOIS, Google Safe Browsing, PhishTank, HIBP (config keys exist, no clients).
+- [ ] **Knowledge Base**: MITRE ATT&CK / CWE / taxonomy modules are small placeholder dictionaries and are not yet linked to rules or findings.
 - [ ] **AI Analyst**: Contextual LLM summary generation based strictly on verified evidence.
-- [ ] **Database & Multi-tenancy**: PostgreSQL/SQLModel persistence layer for investigation history.
-- [ ] **React Frontend**: Next.js/Vite enterprise threat analyst dashboard.
+- [ ] **Report Generator**: STIX 2.1 bundles and executive PDF reports.
+- [ ] **Database & Multi-tenancy**: PostgreSQL/SQLModel persistence for investigation history (the dashboard currently keeps history in the browser only).
+- [ ] **Auth & hardening**: API authentication, request rate limiting, Docker/CI setup.

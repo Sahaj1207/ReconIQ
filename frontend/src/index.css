@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-canvas: #0b1018;
+  --color-surface: #111826;
+  --color-surface-2: #172031;
+  --color-line: #233047;
+  --color-line-strong: #31415e;
+  --color-ink: #e6edf7;
+  --color-ink-muted: #9aa8bf;
+  --color-ink-faint: #64748b;
+  --color-accent: #22d3ee;
+  --color-accent-strong: #06b6d4;
+  --color-ok: #34d399;
+  --color-fail: #f87171;
+
+  --color-sev-critical: #f43f5e;
+  --color-sev-high: #fb923c;
+  --color-sev-medium: #facc15;
+  --color-sev-low: #38bdf8;
+  --color-sev-info: #94a3b8;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    background-image: radial-gradient(1200px 500px at 15% -10%, rgb(34 211 238 / 0.07), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgb(34 211 238 / 0.3);
+  }
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-surface/80 backdrop-blur-sm;
+  }
+  .card-header {
+    @apply flex items-center justify-between gap-3 border-b border-line px-5 py-3.5;
+  }
+  .card-title {
+    @apply flex items-center gap-2 text-sm font-semibold tracking-wide text-ink;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-2 hover:text-ink;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-accent px-4 py-2 font-semibold text-slate-950 hover:bg-accent-strong;
+  }
+}
+
+@keyframes scan {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}
+.animate-scan {
+  animation: scan 1.4s ease-in-out infinite;
+}
