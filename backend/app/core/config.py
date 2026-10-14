@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     # Gemini alternative, used when GEMINI_API_KEY is set and ANTHROPIC_API_KEY is not
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.7-flash"
+    # Tried when the primary model is overloaded (HTTP 5xx) or unknown (404); empty disables
+    GEMINI_FALLBACK_MODEL: str = "gemini-3.6-flash"
 
     # CORS Configuration
     CORS_ORIGINS: List[str] = [

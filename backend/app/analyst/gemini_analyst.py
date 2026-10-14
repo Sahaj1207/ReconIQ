@@ -5,9 +5,11 @@ Same contract as the Claude analyst: the model sees only the structured, already
 evidence, returns schema-constrained JSON, and can never alter the deterministic verdict.
 """
 
+import asyncio
 import json
 import logging
-from typing import Any, Dict
+import time
+from typing import Any, Dict, List
 
 import httpx
 
@@ -31,12 +33,65 @@ RESPONSE_SCHEMA = {
 }
 
 
+# "Overloaded" / transient server errors worth retrying; quota (429) and client errors are not.
+RETRYABLE_STATUSES = {500, 502, 503, 504}
+RETRY_DELAYS = (1.0, 2.0)  # seconds before the 2nd and 3rd attempt on the same model
+
+
 class GeminiError(RuntimeError):
     """A Gemini API failure; `status` is the HTTP status when the API answered."""
 
     def __init__(self, message: str, status: int = 0) -> None:
         super().__init__(message)
         self.status = status
+
+
+def _models() -> List[str]:
+    """Primary model, then the fallback (if set and different)."""
+    models = [settings.GEMINI_MODEL]
+    if settings.GEMINI_FALLBACK_MODEL and settings.GEMINI_FALLBACK_MODEL != settings.GEMINI_MODEL:
+        models.append(settings.GEMINI_FALLBACK_MODEL)
+    return models
+
+
+async def _post(client: httpx.AsyncClient, model: str, body: Dict[str, Any], timeout: float) -> httpx.Response:
+    try:
+        return await client.post(
+            API_URL.format(model=model),
+            headers={"x-goog-api-key": settings.GEMINI_API_KEY},  # header, so the key never appears in URLs or logs
+            json=body,
+            timeout=timeout,
+        )
+    except httpx.HTTPError as exc:
+        raise GeminiError(f"could not reach the Gemini API ({type(exc).__name__})") from exc
+
+
+async def _call_with_retries(body: Dict[str, Any]) -> httpx.Response:
+    """
+    Tries the primary model (retrying transient 5xx errors), then the fallback model. Every attempt
+    shares one overall budget of ANALYST_TIMEOUT_SECONDS so the request fits the hosting time limit.
+    """
+    deadline = time.monotonic() + settings.ANALYST_TIMEOUT_SECONDS
+    last_error = GeminiError("Gemini API was not called")
+    async with httpx.AsyncClient() as client:
+        for model in _models():
+            for attempt in range(len(RETRY_DELAYS) + 1):
+                remaining = deadline - time.monotonic()
+                if remaining <= 1:
+                    raise last_error
+                res = await _post(client, model, body, timeout=remaining)
+                if res.status_code == 200:
+                    return res
+                last_error = GeminiError(f"Gemini API error (HTTP {res.status_code})", res.status_code)
+                if res.status_code == 404:
+                    break  # unknown model name: no point retrying it, try the fallback
+                if res.status_code not in RETRYABLE_STATUSES:
+                    raise last_error  # bad key, quota, bad request: the fallback model won't help
+                if attempt < len(RETRY_DELAYS):
+                    logger.info(f"Gemini {model} returned HTTP {res.status_code}; retrying")
+                    await asyncio.sleep(min(RETRY_DELAYS[attempt], max(0.0, deadline - time.monotonic() - 1)))
+            logger.warning(f"Gemini {model} unavailable ({last_error}); trying the next model if any")
+    raise last_error
 
 
 async def generate_gemini_report(result: Dict[str, Any]) -> AnalystReport:
@@ -50,19 +105,7 @@ async def generate_gemini_report(result: Dict[str, Any]) -> AnalystReport:
             "maxOutputTokens": 8192,
         },
     }
-    try:
-        async with httpx.AsyncClient(timeout=settings.ANALYST_TIMEOUT_SECONDS) as client:
-            res = await client.post(
-                API_URL.format(model=settings.GEMINI_MODEL),
-                headers={"x-goog-api-key": settings.GEMINI_API_KEY},  # header, so the key never appears in URLs or logs
-                json=body,
-            )
-    except httpx.HTTPError as exc:
-        raise GeminiError(f"could not reach the Gemini API ({type(exc).__name__})") from exc
-
-    if res.status_code != 200:
-        raise GeminiError(f"Gemini API error (HTTP {res.status_code})", res.status_code)
-
+    res = await _call_with_retries(body)
     data = res.json()
     block = (data.get("promptFeedback") or {}).get("blockReason")
     if block:

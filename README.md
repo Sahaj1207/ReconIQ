@@ -116,7 +116,7 @@ All settings are environment variables (or `backend/.env`). See `backend/.env.ex
 | `INTEL_TIMEOUT_SECONDS` / `INTEL_CONCURRENCY` / `INTEL_MAX_ARTIFACTS_PER_CATEGORY` | `8` / `8` / `25` | Lookup tuning. |
 | `ANTHROPIC_API_KEY` | empty | Enables the Claude-written analyst report. |
 | `ANALYST_ENABLED` / `ANALYST_MODEL` / `ANALYST_EFFORT` | `true` / `claude-opus-5-5` / `medium` | Analyst behaviour. |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | empty / `gemini-3.7-flash` | Gemini-written analyst report, used when `ANTHROPIC_API_KEY` is not set. Free keys: https://aistudio.google.com/apikey. |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | empty / `gemini-3.7-flash` / `gemini-3.6-flash` | Gemini-written analyst report, used when `ANTHROPIC_API_KEY` is not set. Overloaded (5xx) responses are retried twice, then the fallback model is tried; all attempts share `ANALYST_TIMEOUT_SECONDS`. Free keys: https://aistudio.google.com/apikey. |
 | `DATABASE_URL` | `sqlite:///./reconiq.db` | e.g. `postgresql+psycopg://user:pass@host/db`. |
 | `PERSIST_INVESTIGATIONS` | `true` | Save investigations to history. |
 | `API_KEYS` | empty | Comma-separated keys; when set, every endpoint except health requires `X-API-Key` or `Authorization: Bearer`. |

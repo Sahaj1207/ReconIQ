@@ -29,7 +29,9 @@ def gemini_on(monkeypatch):
     monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "")
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini-key")
     monkeypatch.setattr(settings, "GEMINI_MODEL", "gemini-3.7-flash")
+    monkeypatch.setattr(settings, "GEMINI_FALLBACK_MODEL", "gemini-3.6-flash")
     monkeypatch.setattr(settings, "ANALYST_ENABLED", True)
+    monkeypatch.setattr(gemini_analyst, "RETRY_DELAYS", (0.0, 0.0))
 
 
 def mock_gemini(monkeypatch, handler):
@@ -114,3 +116,38 @@ async def test_unreachable_gemini_falls_back(gemini_on, monkeypatch):
 async def test_capabilities_report_gemini(gemini_on, async_client):
     caps = (await async_client.get("/api/v1/system/capabilities")).json()
     assert caps["analyst"] == {"mode": "gemini", "model": "gemini-3.7-flash"}
+
+
+@pytest.mark.asyncio
+async def test_overloaded_model_is_retried(gemini_on, monkeypatch):
+    result = await phish_result()
+    replies = iter([httpx.Response(503, json={}), httpx.Response(503, json={}), ok_response()])
+    seen = mock_gemini(monkeypatch, lambda req: next(replies))
+    report = await generate_report(result)
+    assert report.generated_by == "gemini" and len(seen) == 3
+    assert all("gemini-3.7-flash" in r.url.path for r in seen)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("primary_status, primary_calls", [(503, 3), (404, 1)])
+async def test_fallback_model_used_when_primary_unavailable(gemini_on, monkeypatch, primary_status, primary_calls):
+    def handler(req):
+        if "gemini-3.7-flash" in req.url.path:
+            return httpx.Response(primary_status, json={})
+        return httpx.Response(200, json={
+            "candidates": [{"content": {"parts": [{"text": json.dumps(REPORT)}]}, "finishReason": "STOP"}],
+            "modelVersion": "gemini-3.6-flash",
+        })
+    result = await phish_result()
+    seen = mock_gemini(monkeypatch, handler)
+    report = await generate_report(result)
+    assert report.generated_by == "gemini" and report.model == "gemini-3.6-flash"
+    assert sum("gemini-3.7-flash" in r.url.path for r in seen) == primary_calls
+
+
+@pytest.mark.asyncio
+async def test_bad_key_is_not_retried_or_sent_to_fallback(gemini_on, monkeypatch):
+    result = await phish_result()
+    seen = mock_gemini(monkeypatch, lambda req: httpx.Response(403, json={}))
+    report = await generate_report(result)
+    assert report.generated_by == "template" and len(seen) == 1
