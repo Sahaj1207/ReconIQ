@@ -8,6 +8,7 @@ evidence, returns schema-constrained JSON, and can never alter the deterministic
 import asyncio
 import json
 import logging
+import re
 import time
 from typing import Any, Dict, List
 
@@ -46,6 +47,20 @@ class GeminiError(RuntimeError):
         self.status = status
 
 
+def _api_error(res: httpx.Response) -> GeminiError:
+    """GeminiError carrying Google's own status and message (e.g. UNAVAILABLE: model overloaded)."""
+    detail = ""
+    try:
+        err = (res.json() or {}).get("error") or {}
+        reason = " ".join(str(x) for x in (err.get("status"), err.get("message")) if x)
+        # Google's messages don't echo keys, but never let anything key-shaped reach the UI
+        detail = re.sub(r"AIza[0-9A-Za-z_\-]{20,}", "[key]", reason)[:200]
+    except ValueError:
+        pass
+    message = f"Gemini API error (HTTP {res.status_code})" + (f": {detail}" if detail else "")
+    return GeminiError(message, res.status_code)
+
+
 def _models() -> List[str]:
     """Primary model, then the fallback (if set and different)."""
     models = [settings.GEMINI_MODEL]
@@ -82,7 +97,7 @@ async def _call_with_retries(body: Dict[str, Any]) -> httpx.Response:
                 res = await _post(client, model, body, timeout=remaining)
                 if res.status_code == 200:
                     return res
-                last_error = GeminiError(f"Gemini API error (HTTP {res.status_code})", res.status_code)
+                last_error = _api_error(res)
                 if res.status_code == 404:
                     break  # unknown model name: no point retrying it, try the fallback
                 if res.status_code not in RETRYABLE_STATUSES:
@@ -91,6 +106,7 @@ async def _call_with_retries(body: Dict[str, Any]) -> httpx.Response:
                     logger.info(f"Gemini {model} returned HTTP {res.status_code}; retrying")
                     await asyncio.sleep(min(RETRY_DELAYS[attempt], max(0.0, deadline - time.monotonic() - 1)))
             logger.warning(f"Gemini {model} unavailable ({last_error}); trying the next model if any")
+            last_error = GeminiError(f"{last_error} [{model}]", last_error.status)
     raise last_error
 
 

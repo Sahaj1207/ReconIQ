@@ -151,3 +151,15 @@ async def test_bad_key_is_not_retried_or_sent_to_fallback(gemini_on, monkeypatch
     seen = mock_gemini(monkeypatch, lambda req: httpx.Response(403, json={}))
     report = await generate_report(result)
     assert report.generated_by == "template" and len(seen) == 1
+
+
+@pytest.mark.asyncio
+async def test_google_error_message_is_shown_without_keys(gemini_on, monkeypatch):
+    result = await phish_result()
+    body = {"error": {"code": 503, "status": "UNAVAILABLE",
+                      "message": "The model is overloaded. Please try again later. AIzaSyFAKEFAKEFAKEFAKEFAKEFAKE12"}}
+    mock_gemini(monkeypatch, lambda req: httpx.Response(503, json=body))
+    report = await generate_report(result)
+    assert report.generated_by == "template"
+    assert "UNAVAILABLE The model is overloaded" in report.note and "[gemini-3.6-flash]" in report.note
+    assert "AIza" not in report.note
