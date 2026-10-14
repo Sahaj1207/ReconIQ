@@ -26,6 +26,7 @@ async def test_api_key_required_when_configured(async_client, monkeypatch):
 @pytest.mark.asyncio
 async def test_rate_limit(async_client, monkeypatch):
     monkeypatch.setattr(settings, "RATE_LIMIT_PER_MINUTE", 3)
+    monkeypatch.setattr(settings, "API_KEYS", "rate-limit-test-client")
     headers = {"X-API-Key": "rate-limit-test-client"}
     codes = [(await async_client.get("/api/v1/investigations", headers=headers)).status_code for _ in range(4)]
     assert codes == [200, 200, 200, 429]
@@ -53,6 +54,7 @@ async def test_capabilities(async_client):
 @pytest.mark.asyncio
 async def test_rate_limited_response_keeps_cors_headers(async_client, monkeypatch):
     monkeypatch.setattr(settings, "RATE_LIMIT_PER_MINUTE", 1)
+    monkeypatch.setattr(settings, "API_KEYS", "cors-test-client")
     headers = {"X-API-Key": "cors-test-client", "Origin": "http://localhost:5173"}
     await async_client.get("/api/v1/investigations", headers=headers)
     limited = await async_client.get("/api/v1/investigations", headers=headers)

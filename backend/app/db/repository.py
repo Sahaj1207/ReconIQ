@@ -26,11 +26,13 @@ def _summary(rec: InvestigationRecord) -> Dict[str, Any]:
         "severity": rec.severity,
         "classification": rec.classification,
         "ioc_count": rec.ioc_count,
+        "owner_id": rec.owner_id,
+        "owner_email": rec.owner_email,
     }
 
 
 class InvestigationRepository:
-    def save(self, result: InvestigationResult) -> None:
+    def save(self, result: InvestigationResult, owner=None) -> None:
         risk = result.risk_assessment or {}
         record = InvestigationRecord(
             id=result.investigation_id,
@@ -44,6 +46,8 @@ class InvestigationRepository:
             classification=risk.get("classification", "no_threat_identified"),
             ioc_count=sum((result.evidence_summary or {}).values()),
             result=result.model_dump(mode="json"),
+            owner_id=getattr(owner, "id", None),
+            owner_email=getattr(owner, "email", None) if getattr(owner, "kind", None) == "user" else None,
         )
         with session_scope() as s:
             s.merge(record)
@@ -51,11 +55,15 @@ class InvestigationRepository:
     def get(self, investigation_id: str) -> Optional[Dict[str, Any]]:
         with session_scope() as s:
             rec = s.get(InvestigationRecord, investigation_id)
-            return dict(rec.result) if rec else None
+            if not rec:
+                return None
+            return {**rec.result, "owner_id": rec.owner_id, "owner_email": rec.owner_email}
 
     def list(self, limit: int = 25, offset: int = 0, severity: Optional[str] = None,
-             q: Optional[str] = None) -> Dict[str, Any]:
+             q: Optional[str] = None, owner_id: Optional[str] = None) -> Dict[str, Any]:
         stmt = select(InvestigationRecord)
+        if owner_id:
+            stmt = stmt.where(InvestigationRecord.owner_id == owner_id)
         if severity:
             stmt = stmt.where(InvestigationRecord.severity == severity.upper())
         if q:

@@ -11,7 +11,8 @@ from fastapi import APIRouter
 from app import __version__
 from app.analyst import analyst_mode
 from app.core.config import settings
-from app.core.security import configured_keys
+from app.auth.principal import Principal, auth_required, require_role
+from fastapi import Depends
 from app.ingestion.parsers.image_parser import ocr_available
 from app.integrations.registry import provider_status
 from app.risk_engine.rules import RuleRegistry
@@ -28,12 +29,13 @@ def _qr_available() -> bool:
 
 
 @router.get("/capabilities", summary="Deployment Capabilities")
-def capabilities() -> Dict[str, Any]:
+def capabilities(_: Principal = Depends(require_role("viewer"))) -> Dict[str, Any]:
     rules = RuleRegistry().get_all_rules()
     return {
         "version": __version__,
         "environment": settings.ENVIRONMENT,
-        "auth_enabled": bool(configured_keys()),
+        "auth_enabled": auth_required(),
+        "signup_role": settings.SIGNUP_ROLE,
         "rate_limit_per_minute": settings.RATE_LIMIT_PER_MINUTE,
         "persistence": settings.PERSIST_INVESTIGATIONS,
         "analyst": {"mode": analyst_mode(), "model": settings.ANALYST_MODEL if analyst_mode() == "claude" else None},

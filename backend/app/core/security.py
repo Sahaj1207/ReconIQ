@@ -1,52 +1,28 @@
 """
 API security: optional API-key authentication and per-client rate limiting.
 
-- Authentication is enabled when API_KEYS (comma-separated) is non-empty. Clients send
-  `X-API-Key: <key>` or `Authorization: Bearer <key>`. Keys are compared in constant time.
+- Authentication and roles live in app.auth; this module only identifies clients by credential.
 - Rate limiting applies a sliding window per client (API key, else IP) to /api/v1 routes,
   except health. RATE_LIMIT_PER_MINUTE=0 disables it. State is in-process; use a shared
   store (e.g. Redis) when running several replicas.
 """
 
 import hashlib
-import hmac
 import time
 from collections import defaultdict, deque
 from typing import Deque, Dict, Optional
 
-from fastapi import HTTPException, Request, status
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from app.core.config import settings
 
 
-def configured_keys() -> list:
-    return [k.strip() for k in settings.API_KEYS.split(",") if k.strip()]
-
-
 def extract_key(request: Request) -> Optional[str]:
-    key = request.headers.get("x-api-key")
-    if key:
-        return key.strip()
-    auth = request.headers.get("authorization", "")
-    if auth.lower().startswith("bearer "):
-        return auth[7:].strip()
-    return None
-
-
-async def require_api_key(request: Request) -> None:
-    """FastAPI dependency guarding protected routers."""
-    keys = configured_keys()
-    if not keys:
-        return
-    supplied = extract_key(request)
-    if not supplied or not any(hmac.compare_digest(supplied.encode(), k.encode()) for k in keys):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid API key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    """Credential used to identify a client for rate limiting (API key or session token)."""
+    from app.auth.principal import extract_credential
+    return extract_credential(request)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

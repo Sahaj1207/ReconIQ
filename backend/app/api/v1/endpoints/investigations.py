@@ -10,11 +10,13 @@ ReconIQ Investigation History Endpoints
 
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from app.reports import build_stix_bundle, render_markdown, render_pdf
 
+from app.auth.principal import Principal, client_ip, require_role
+from app.auth.repository import AuditRepository
 from app.db.repository import InvestigationRepository
 
 router = APIRouter()
@@ -27,12 +29,15 @@ def list_investigations(
     offset: int = Query(0, ge=0),
     severity: Optional[str] = Query(None, pattern="^(?i)(critical|high|medium|low|informational)$"),
     q: Optional[str] = Query(None, max_length=200, description="Search preview, filename, classification or ID"),
+    mine: bool = Query(False, description="Only investigations created by the current user"),
+    principal: Principal = Depends(require_role("viewer")),
 ) -> Dict[str, Any]:
-    return repository.list(limit=limit, offset=offset, severity=severity, q=q)
+    owner_id = principal.id if mine and principal.id else None
+    return repository.list(limit=limit, offset=offset, severity=severity, q=q, owner_id=owner_id)
 
 
 @router.get("/stats", summary="Investigation Statistics")
-def investigation_stats() -> Dict[str, Any]:
+def investigation_stats(_: Principal = Depends(require_role("viewer"))) -> Dict[str, Any]:
     return repository.stats()
 
 
@@ -44,14 +49,18 @@ def load_or_404(investigation_id: str) -> Dict[str, Any]:
 
 
 @router.get("/{investigation_id}", summary="Get Investigation")
-def get_investigation(investigation_id: str) -> Dict[str, Any]:
+def get_investigation(investigation_id: str, _: Principal = Depends(require_role("viewer"))) -> Dict[str, Any]:
     return load_or_404(investigation_id)
 
 
 @router.delete("/{investigation_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete Investigation")
-def delete_investigation(investigation_id: str) -> Response:
-    if not repository.delete(investigation_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Investigation not found")
+def delete_investigation(investigation_id: str, request: Request,
+                         principal: Principal = Depends(require_role("analyst"))) -> Response:
+    existing = load_or_404(investigation_id)
+    if not principal.has("admin") and existing.get("owner_id") != principal.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner or an admin can delete this")
+    repository.delete(investigation_id)
+    AuditRepository().record("investigation.deleted", principal, "investigation", investigation_id, ip=client_ip(request))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -59,6 +68,7 @@ def delete_investigation(investigation_id: str) -> Response:
 def export_report(
     investigation_id: str,
     format: str = Query("json", pattern="^(json|stix|markdown|pdf)$"),
+    _: Principal = Depends(require_role("viewer")),
 ) -> Response:
     result = load_or_404(investigation_id)
     stem = f"reconiq-{investigation_id[:8]}"
