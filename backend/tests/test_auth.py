@@ -50,7 +50,7 @@ async def test_auth_required_when_enabled(async_client, auth_on):
 async def test_bootstrap_admin_and_signup_roles(async_client, auth_on, monkeypatch):
     admin_headers, _ = await make_admin(async_client, monkeypatch)
     analyst_headers, analyst = await signup(async_client, email("analyst"))
-    assert analyst["role"] == "analyst"
+    assert analyst["role"] == "analyst" and analyst["last_login_at"].endswith("+00:00")
     me = (await async_client.get("/api/v1/auth/me", headers=analyst_headers)).json()
     assert me["role"] == "analyst" and me["user"]["email"] == analyst["email"]
     # duplicate email

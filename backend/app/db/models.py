@@ -7,16 +7,34 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
+
+
+class UTCDateTime(TypeDecorator):
+    """Timezone-aware timestamp that always loads as UTC (SQLite drops tzinfo on round trip)."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class InvestigationRecord(Base):
     __tablename__ = "investigations"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True,
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True,
                                                  default=lambda: datetime.now(timezone.utc))
     status: Mapped[str] = mapped_column(String(32))
     source_type: Mapped[str] = mapped_column(String(32), index=True)
@@ -44,15 +62,15 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(16), default="analyst")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_now)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_now, index=True)
     actor_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
     actor_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
     action: Mapped[str] = mapped_column(String(64), index=True)

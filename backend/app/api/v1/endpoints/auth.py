@@ -10,6 +10,7 @@ ReconIQ Authentication & User Management Endpoints
 """
 
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -86,6 +87,8 @@ def register(body: Registration, request: Request) -> Dict[str, Any]:
     if users.get_by_email(body.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists")
     user = users.create(body.email, body.name.strip(), hash_password(body.password), role)
+    # Registering signs the user in, so it counts as their first sign-in.
+    user = users.update(user["id"], last_login_at=datetime.now(timezone.utc))
     audit.record("user.registered", actor=Principal(user["id"], user["email"], role, "user"),
                  target_type="user", target_id=user["id"], detail={"role": role}, ip=client_ip(request))
     return _session(user)
@@ -97,7 +100,6 @@ def login(body: Credentials, request: Request) -> Dict[str, Any]:
     if not record or not verify_password(body.password, record["password_hash"]) or not record["is_active"]:
         audit.record("auth.login_failed", detail={"email": body.email}, ip=client_ip(request))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
-    from datetime import datetime, timezone
     user = users.update(record["id"], last_login_at=datetime.now(timezone.utc))
     audit.record("auth.login", actor=Principal(user["id"], user["email"], user["role"], "user"), ip=client_ip(request))
     return _session(user)

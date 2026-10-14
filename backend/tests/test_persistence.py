@@ -33,3 +33,12 @@ async def test_investigation_is_saved_listed_fetched_and_deleted(async_client):
 @pytest.mark.asyncio
 async def test_severity_filter_validation(async_client):
     assert (await async_client.get("/api/v1/investigations", params={"severity": "bogus"})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_listed_timestamps_carry_utc_offset(async_client):
+    # SQLite drops tzinfo; without an offset browsers read the time as local and show "5h ago".
+    created = (await async_client.post("/api/v1/evidence/investigate", json={"text": PHISH})).json()
+    listing = (await async_client.get("/api/v1/investigations")).json()["items"]
+    item = next(i for i in listing if i["investigation_id"] == created["investigation_id"])
+    assert item["created_at"].endswith("+00:00")
