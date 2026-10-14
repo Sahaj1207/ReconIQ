@@ -4,6 +4,14 @@ ReconIQ Pytest Configuration & Fixtures
 Provides test client fixtures and sample threat intelligence payload samples for unit & API tests.
 """
 
+import os
+
+# Keep the test suite offline: no keyless intel calls, no provider or LLM keys.
+os.environ["INTEL_KEYLESS_PROVIDERS"] = "false"
+for _key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "URLHAUS_AUTH_KEY", "GOOGLE_SAFE_BROWSING_API_KEY",
+             "HIBP_API_KEY", "ANTHROPIC_API_KEY"):
+    os.environ[_key] = ""
+
 import pytest
 from httpx import AsyncClient, ASGITransport
 from app.main import app

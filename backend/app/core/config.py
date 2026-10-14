@@ -39,11 +39,17 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
-    # Future Threat Intelligence Integrations (Placeholders)
-    # TODO: Add authentication & key storage when integration providers are implemented.
+    # Threat Intelligence Integrations (a provider is enabled when its key is set)
     VIRUSTOTAL_API_KEY: str = ""
     ABUSEIPDB_API_KEY: str = ""
-    SHODAN_API_KEY: str = ""
+    URLHAUS_AUTH_KEY: str = ""
+    GOOGLE_SAFE_BROWSING_API_KEY: str = ""
+    HIBP_API_KEY: str = ""
+    # Keyless providers (Shodan InternetDB, RDAP) make outbound calls; disable for air-gapped use
+    INTEL_KEYLESS_PROVIDERS: bool = True
+    INTEL_TIMEOUT_SECONDS: float = 8.0
+    INTEL_MAX_ARTIFACTS_PER_CATEGORY: int = 25
+    INTEL_CONCURRENCY: int = 8
 
 
 # Global Singleton Settings Instance

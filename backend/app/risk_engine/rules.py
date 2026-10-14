@@ -189,6 +189,24 @@ class InvalidEmailRule(BaseRule):
 
 # --- Threat Intelligence Rules ---
 
+FLAGGING_SEVERITIES = {"MEDIUM", "HIGH", "CRITICAL"}
+
+
+def is_flagged_malicious(res: Any) -> bool:
+    """
+    A provider response counts as a malicious verdict only when the lookup succeeded AND it carries
+    at least one MEDIUM+ threat indicator. Provider `confidence` describes certainty in the verdict
+    (a clean VirusTotal result reports 0.8), so it must never be read as maliciousness on its own.
+    """
+    get = (lambda k, d=None: res.get(k, d)) if isinstance(res, dict) else (lambda k, d=None: getattr(res, k, d))
+    if str(get("status", "")).split(".")[-1] != "SUCCESS":
+        return False
+    for ind in get("threat_indicators", []) or []:
+        sev = ind.get("severity") if isinstance(ind, dict) else getattr(ind, "severity", "")
+        if str(sev).upper() in FLAGGING_SEVERITIES:
+            return True
+    return False
+
 class ProviderMaliciousRule(BaseRule):
     """Triggers when a threat intel provider reports malicious indicators or high confidence threat."""
     def __init__(self) -> None:
@@ -214,7 +232,7 @@ class ProviderMaliciousRule(BaseRule):
                 provider = getattr(res, "provider", "intel") if hasattr(res, "provider") else res.get("provider", "intel")
                 artifact = getattr(res, "artifact", "target") if hasattr(res, "artifact") else res.get("artifact", "target")
 
-                if (status == "SUCCESS" or status == "SUCCESS") and (conf >= 0.7 or len(indicators) > 0):
+                if is_flagged_malicious(res):
                     flagged_artifacts.append((provider, artifact, conf))
 
         if flagged_artifacts:
@@ -255,7 +273,7 @@ class ProviderConsensusRule(BaseRule):
                 provider = getattr(res, "provider", "intel") if hasattr(res, "provider") else res.get("provider", "intel")
                 artifact = getattr(res, "artifact", "target") if hasattr(res, "artifact") else res.get("artifact", "target")
 
-                if status == "SUCCESS" and conf >= 0.7:
+                if is_flagged_malicious(res) and provider not in artifact_providers.get(artifact, []):
                     artifact_providers.setdefault(artifact, []).append(provider)
 
         consensus_artifacts = {art: provs for art, provs in artifact_providers.items() if len(provs) >= 2}

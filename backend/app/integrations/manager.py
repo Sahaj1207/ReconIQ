@@ -191,17 +191,33 @@ class ThreatIntelManager:
         start_time = time.perf_counter()
         aggregated: Dict[str, List[ThreatIntelResponse]] = {}
 
+        from app.core.config import settings
+        semaphore = asyncio.Semaphore(max(1, settings.INTEL_CONCURRENCY))
+
+        async def bounded(artifact_str: str, category: str) -> List[ThreatIntelResponse]:
+            async with semaphore:
+                return await self.lookup_artifact(artifact_str, category)
+
+        jobs = []
         for category, items in evidence.items():
             aggregated[category] = []
-            for item in items:
+            if not self.get_providers_for_artifact(category):
+                continue
+            for item in list(items)[: settings.INTEL_MAX_ARTIFACTS_PER_CATEGORY]:
                 # Support string artifacts or ValidationResult objects
                 artifact_str = item.artifact if hasattr(item, "artifact") else str(item)
                 # Skip invalid items if item is ValidationResult and invalid
                 if hasattr(item, "valid") and not item.valid:
                     continue
+                # Private / reserved addresses have no public reputation
+                props = getattr(item, "properties", None) or {}
+                if category in ("ipv4", "ipv6") and props.get("is_global") is False:
+                    continue
+                jobs.append((category, bounded(artifact_str, category)))
 
-                responses = await self.lookup_artifact(artifact_str, category)
-                aggregated[category].extend(responses)
+        results = await asyncio.gather(*(job for _, job in jobs))
+        for (category, _), responses in zip(jobs, results):
+            aggregated[category].extend(responses)
 
         total_latency = round((time.perf_counter() - start_time) * 1000, 2)
         total_responses = sum(len(v) for v in aggregated.values())

@@ -28,7 +28,6 @@ from app.ingestion.collector import EvidenceCollector
 from app.utils.normalizer import Normalizer
 from app.validators.validator import Validator
 from app.integrations.manager import ThreatIntelManager
-from app.integrations.providers.virustotal import VirusTotalProvider
 from app.risk_engine.scorer import RiskScorer
 
 logger = logging.getLogger(__name__)
@@ -125,13 +124,9 @@ class ThreatIntelStep(BasePipelineStep):
         if manager:
             self.manager = manager
         else:
-            # Register default threat intel provider clients
-            self.manager = ThreatIntelManager()
-            try:
-                vt_provider = VirusTotalProvider()
-                self.manager.register_provider(vt_provider)
-            except Exception as exc:
-                logger.warning(f"Could not instantiate default VirusTotal provider in pipeline step: {exc}")
+            # Register every configured threat intel provider
+            from app.integrations.registry import build_default_manager
+            self.manager = build_default_manager()
 
     @property
     def name(self) -> str:
