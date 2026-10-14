@@ -13,6 +13,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+COPY alembic.ini ./
+COPY alembic ./alembic
 COPY app ./app
 
 RUN useradd --create-home --uid 10001 reconiq && mkdir -p /data && chown reconiq /data

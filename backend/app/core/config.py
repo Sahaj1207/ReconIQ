@@ -33,7 +33,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 60
 
     # Persistence (SQLite by default; use postgresql+psycopg://... in production)
-    DATABASE_URL: str = "sqlite:///./reconiq.db"
+    DATABASE_URL: str = ""
+    # Injected by Vercel's Supabase / Neon integrations; used when DATABASE_URL is unset
+    POSTGRES_URL: str = ""
     PERSIST_INVESTIGATIONS: bool = True
 
     # Upload limits
@@ -65,6 +67,18 @@ class Settings(BaseSettings):
     INTEL_TIMEOUT_SECONDS: float = 8.0
     INTEL_MAX_ARTIFACTS_PER_CATEGORY: int = 25
     INTEL_CONCURRENCY: int = 8
+
+
+    @property
+    def database_url(self) -> str:
+        """Effective SQLAlchemy URL: DATABASE_URL, else POSTGRES_URL, else a local SQLite file."""
+        from app.db.urls import normalize_database_url
+        return normalize_database_url(self.DATABASE_URL or self.POSTGRES_URL or "sqlite:///./reconiq.db")
+
+    @property
+    def serverless(self) -> bool:
+        import os
+        return bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
 
 # Global Singleton Settings Instance
