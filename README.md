@@ -7,11 +7,11 @@
 ReconIQ investigates suspicious content — pasted text, emails, PDFs, screenshots and QR codes, Android apps or any
 binary — and produces an explainable risk assessment. A **deterministic-first pipeline** extracts and validates
 indicators, enriches them with threat intelligence, and scores them with a transparent rule engine mapped to MITRE
-ATT&CK. An AI analyst then explains the result in plain language.
+ATT&CK. Each result ends with a plain-language summary, key findings and recommended actions.
 
-> **Core principle — AI never decides whether something is malicious.**
-> Scores, severities and classifications come only from fixed, auditable rules. The AI analyst runs *after* scoring,
-> reads a snapshot of the finished assessment, writes to a separate field, and cannot change the verdict.
+> **Core principle — every verdict is explainable.**
+> Scores, severities and classifications come only from fixed, auditable rules, and every point of the score traces
+> back to a named rule in the audit trail. No machine-learning model or AI is involved in any decision.
 
 ---
 
@@ -23,9 +23,9 @@ ATT&CK. An AI analyst then explains the result in plain language.
 | **Indicators** | IPv4/IPv6, URLs (including IP-literal hosts), domains, emails, phone numbers and MD5/SHA-1/SHA-256 hashes — refanged, normalized and validated (RFC checks, TLDs, private/reserved ranges). |
 | **Email analysis** | SPF/DKIM/DMARC verdicts, display name, reply-to and return-path routing, relay IPs, HTML link targets, attachment fingerprints. |
 | **File analysis** | Magic-byte typing, hashes, dangerous-type and extension-mismatch detection, PDF links and active content (`/JavaScript`, `/OpenAction`, `/Launch`…), APK package, permissions and embedded URLs. |
-| **Threat intelligence** | VirusTotal, AbuseIPDB, URLhaus, Google Safe Browsing, Have I Been Pwned (key-based) and Shodan InternetDB and RDAP domain age (keyless). Concurrent, cached and rate-limited, with graceful degradation. |
-| **Risk engine** | 35 deterministic rules → 0–100 score, severity, confidence, primary classification, ranked threat categories, MITRE ATT&CK techniques and CWE references, with a full audit trail. |
-| **AI analyst** | Claude (when `ANTHROPIC_API_KEY` is set) or Gemini (when `GEMINI_API_KEY` is set) writes an executive summary, key findings and recommended actions; otherwise a deterministic template does. The model only explains the verdict and never changes it. |
+| **Threat intelligence** | VirusTotal, AbuseIPDB, URLhaus, Google Safe Browsing, Have I Been Pwned (key-based) and Shodan InternetDB and RDAP domain age (keyless). Concurrent, cached and rate-limited, with graceful degradation. A VirusTotal detection counts as malicious only when at least 3 engines agree; isolated detections are reported as weak signals. |
+| **Risk engine** | 36 deterministic rules → 0–100 score, severity, confidence, primary classification, ranked threat categories, MITRE ATT&CK techniques and CWE references, with a full audit trail. |
+| **Analyst summary** | A deterministic executive summary, key findings and recommended actions generated from the scored evidence. |
 | **Reports** | PDF and Markdown (indicators defanged), STIX 2.1 bundles (observables, indicators, attack-patterns, relationships, report) and raw JSON. |
 | **History** | Every investigation is stored (SQLite by default, PostgreSQL supported) with search, severity filters and dashboard statistics. |
 | **Security** | Optional API-key authentication, per-client rate limiting, security headers, upload size limits and zip-bomb guards. |
@@ -36,8 +36,8 @@ ATT&CK. An AI analyst then explains the result in plain language.
 ## Investigation pipeline
 
 ```
-Input ─► Ingestion ─► Evidence collection ─► Normalization ─► Validation ─► Threat intel ─► Risk engine ─► AI analyst
-(text,   (parsers:     (IOC extractor +       (refang,          (RFC/TLD/     (7 providers,   (35 rules,     (explains;
+Input ─► Ingestion ─► Evidence collection ─► Normalization ─► Validation ─► Threat intel ─► Risk engine ─► Summary
+(text,   (parsers:     (IOC extractor +       (refang,          (RFC/TLD/     (7 providers,   (36 rules,     (explains;
  files)   eml, pdf,     seeded file hashes)    canonicalize)     scope checks)  concurrent)     ATT&CK, CWE)   never scores)
           qr, apk)
                                                                                                  │
@@ -91,7 +91,7 @@ codes and fingerprinted.
 ### Tests
 
 ```bash
-cd backend && python -m pytest -q      # 154 tests, fully offline (HTTP providers and Claude are mocked)
+cd backend && python -m pytest -q      # 162 tests, fully offline (HTTP providers are mocked)
 cd frontend && npm test                # Vitest + Testing Library component tests (jsdom)
 cd frontend && npm run build           # type-check + production build
 ```
@@ -114,9 +114,6 @@ All settings are environment variables (or `backend/.env`). See `backend/.env.ex
 | `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, `URLHAUS_AUTH_KEY`, `GOOGLE_SAFE_BROWSING_API_KEY`, `HIBP_API_KEY` | empty | Each provider is enabled when its key is set. |
 | `INTEL_KEYLESS_PROVIDERS` | `true` | Enable Shodan InternetDB and RDAP (outbound calls, no key). |
 | `INTEL_TIMEOUT_SECONDS` / `INTEL_CONCURRENCY` / `INTEL_MAX_ARTIFACTS_PER_CATEGORY` | `8` / `8` / `25` | Lookup tuning. |
-| `ANTHROPIC_API_KEY` | empty | Enables the Claude-written analyst report. |
-| `ANALYST_ENABLED` / `ANALYST_MODEL` / `ANALYST_EFFORT` | `true` / `claude-opus-5-5` / `medium` | Analyst behaviour. |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | empty / `gemini-3.7-flash` / `gemini-3.6-flash` | Gemini-written analyst report, used when `ANTHROPIC_API_KEY` is not set. Overloaded (5xx) responses are retried twice, then the fallback model is tried; all attempts share `ANALYST_TIMEOUT_SECONDS`. Free keys: https://aistudio.google.com/apikey. |
 | `DATABASE_URL` | `sqlite:///./reconiq.db` | e.g. `postgresql+psycopg://user:pass@host/db`. |
 | `PERSIST_INVESTIGATIONS` | `true` | Save investigations to history. |
 | `API_KEYS` | empty | Comma-separated keys; when set, every endpoint except health requires `X-API-Key` or `Authorization: Bearer`. |
@@ -173,6 +170,7 @@ Scores are the capped sum of matched rule weights. Severity bands: 0–19 Inform
 | RULE_INT_002 | Multi-Provider Threat Consensus | CRITICAL | 80 |
 | RULE_INT_003 | Threat Intel Provider Failure | INFORMATIONAL | 0 |
 | RULE_INT_004 | Newly Registered Domain (< 30 days) | HIGH | 50 |
+| RULE_INT_005 | Weak Provider Detection (e.g. 1–2 VirusTotal engines) | LOW | 10 |
 | RULE_EVI_001 | Defanged Indicator Obfuscation Detected | MEDIUM | 25 |
 | RULE_EVI_002 | High Artifact Density (≥ 8) | MEDIUM | 25 |
 | RULE_EVI_003 | Public IP Address Present | LOW | 10 |
@@ -213,7 +211,7 @@ threat indicator; provider confidence alone never flags an artifact.
 backend/
   app/
     api/v1/endpoints/   evidence, investigations (history + reports), system, health
-    analyst/            Claude narrative + deterministic template
+    analyst/            deterministic analyst summary
     core/               settings, logging, security (auth, rate limiting, headers)
     db/                 SQLAlchemy models, session, repository
     ingestion/          IOC extractor, collector, parsers (email, pdf, image, apk, file_info)

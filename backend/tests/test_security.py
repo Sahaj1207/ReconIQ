@@ -45,10 +45,10 @@ async def test_security_headers_and_version(async_client):
 @pytest.mark.asyncio
 async def test_capabilities(async_client):
     caps = (await async_client.get("/api/v1/system/capabilities")).json()
-    assert caps["analyst"]["mode"] == "template"
+    assert "analyst" not in caps  # the AI analyst was removed; summaries are always deterministic
     assert caps["ingestion"]["qr_decoding"] is True
     assert {p["name"] for p in caps["threat_intel"]} >= {"VirusTotal", "AbuseIPDB", "RDAP"}
-    assert len(caps["rules"]) == 35
+    assert len(caps["rules"]) == 36
 
 
 @pytest.mark.asyncio
