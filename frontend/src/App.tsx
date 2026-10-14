@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, WifiOff } from "lucide-react";
 import { getCapabilities, getHealth } from "./lib/api";
 import { AuthProvider, useAuth } from "./lib/auth";
 import type { Capabilities } from "./lib/types";
@@ -22,7 +22,7 @@ export default function App() {
 
 function Shell() {
   const route = useHashRoute();
-  const { ready, me, config, can } = useAuth();
+  const { ready, me, config, can, unreachable, reload } = useAuth();
   const [api, setApi] = useState<ApiState>({ kind: "checking" });
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [capsError, setCapsError] = useState<string | null>(null);
@@ -61,6 +61,7 @@ function Shell() {
       </div>
     );
   }
+  if (unreachable) return <ApiUnreachable onRetry={reload} />;
   if (!me && (config?.auth_required ?? false)) return <AuthPage />;
 
   return (
@@ -75,8 +76,34 @@ function Shell() {
           (can("admin") ? <AdminPage tab={route.tab} /> : <p className="text-sm text-ink-muted">Administrators only.</p>)}
       </main>
       <footer className="mx-auto max-w-[1500px] px-6 pb-6 text-[11px] text-ink-faint">
-        ReconIQ · Deterministic-first investigation. AI explains the evidence; it never decides whether an artifact is malicious.
+        ReconIQ · Deterministic investigation: every verdict comes from fixed, auditable rules.
       </footer>
+    </div>
+  );
+}
+
+const RETRY_MS = 10_000;
+
+/** Shown when the API can't be reached at all; retries automatically until it is back. */
+function ApiUnreachable({ onRetry }: { onRetry: () => void }) {
+  useEffect(() => {
+    const id = setInterval(onRetry, RETRY_MS);
+    return () => clearInterval(id);
+  }, [onRetry]);
+
+  return (
+    <div role="alert" className="flex min-h-screen items-center justify-center px-4">
+      <div className="card max-w-md p-6 text-center">
+        <WifiOff className="mx-auto h-8 w-8 text-fail" />
+        <h1 className="mt-3 text-lg font-semibold">Can't reach the ReconIQ API</h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          The service may be restarting or your connection may be down. This page retries automatically every{" "}
+          {RETRY_MS / 1000} seconds.
+        </p>
+        <button type="button" className="btn-primary mt-5 inline-flex" onClick={onRetry}>
+          Retry now
+        </button>
+      </div>
     </div>
   );
 }
