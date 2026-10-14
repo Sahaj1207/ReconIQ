@@ -33,15 +33,14 @@ dependencies = [
     "alembic>=1.13.0",
     "PyJWT>=2.8.0",
     "fpdf2>=2.7.8",
+    # Postgres driver. Required, not optional: Vercel installs from this file, and hosted deployments use Postgres.
+    "psycopg[binary]>=3.1.18",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
-]
-postgres = [
-    "psycopg[binary]>=3.1.18",
 ]
 
 [tool.setuptools.packages.find]
