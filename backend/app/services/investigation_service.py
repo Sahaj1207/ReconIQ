@@ -16,11 +16,13 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.auth.repository import AuditRepository
+from app.db.jobs import JobRepository
 from app.db.repository import InvestigationRepository
 from app.ingestion.collector import EvidenceCollector
 from app.ingestion.ingested_input import IngestedInput
 from app.pipeline.investigation import InvestigationPipeline
-from app.pipeline.models import InvestigationRequest, InvestigationResult
+from app.pipeline.context import sanitize_sensitive_data
+from app.pipeline.models import InvestigationRequest, InvestigationResult, StageStatus
 from app.schemas.evidence import EvidenceCollectionRequest, EvidenceCollectionResponse
 
 
@@ -33,10 +35,15 @@ class InvestigationService:
         self.collector = EvidenceCollector()
         self.pipeline = InvestigationPipeline()
         self.repository = repository or InvestigationRepository()
+        self.jobs = JobRepository()
 
-    async def _persist(self, result: InvestigationResult, owner=None, ip: Optional[str] = None) -> InvestigationResult:
-        """Stores the result for history; a storage failure never fails the investigation."""
-        if settings.PERSIST_INVESTIGATIONS:
+    async def _persist(self, result: InvestigationResult, owner=None, ip: Optional[str] = None,
+                       required: bool = False) -> InvestigationResult:
+        """Stores the result for history; a storage failure never fails a synchronous investigation.
+
+        Background jobs pass required=True: the client fetches the result by ID, so it must be saved.
+        """
+        if settings.PERSIST_INVESTIGATIONS or required:
             try:
                 await run_in_threadpool(self.repository.save, result, owner)
                 await run_in_threadpool(
@@ -45,8 +52,28 @@ class InvestigationService:
                 )
             except Exception as exc:
                 logging.getLogger(__name__).error(f"Failed to persist investigation {result.investigation_id}: {exc}")
+                if required:
+                    raise
                 result.warnings.append("Investigation could not be saved to history")
         return result
+
+    def create_job(self, ingested: IngestedInput, owner=None) -> dict:
+        """Registers a queued job; run it afterwards with run_job (e.g. as a BackgroundTask)."""
+        return self.jobs.create(self.pipeline.stage_names, source_type=getattr(ingested.source_type, "value", str(ingested.source_type)),
+                                source_name=ingested.metadata.get("filename"), owner=owner)
+
+    async def run_job(self, job_id: str, ingested: IngestedInput, owner=None, ip: Optional[str] = None) -> None:
+        """Runs the pipeline for a job, recording each stage so pollers see live progress."""
+        async def on_stage(name: str, status: StageStatus, duration_ms: float, error: Optional[str]) -> None:
+            await run_in_threadpool(self.jobs.record_stage, job_id, name, status.value, duration_ms, error)
+
+        try:
+            result = await self.pipeline.run(ingested, on_stage=on_stage)
+            await self._persist(result, owner, ip, required=True)
+            await run_in_threadpool(self.jobs.finish, job_id, result.investigation_id)
+        except Exception as exc:
+            logging.getLogger(__name__).error(f"Investigation job {job_id} failed: {sanitize_sensitive_data(str(exc))}")
+            await run_in_threadpool(self.jobs.fail, job_id, "Investigation pipeline processing failure")
 
     def extract_evidence(self, payload: EvidenceCollectionRequest) -> EvidenceCollectionResponse:
         """

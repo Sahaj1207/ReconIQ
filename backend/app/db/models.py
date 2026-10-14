@@ -78,3 +78,24 @@ class AuditEvent(Base):
     target_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
     ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class InvestigationJob(Base):
+    """A background investigation and its per-stage progress, polled by the UI."""
+
+    __tablename__ = "investigation_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_now)
+    # queued -> running -> succeeded | failed
+    status: Mapped[str] = mapped_column(String(16), index=True, default="queued")
+    source_type: Mapped[str] = mapped_column(String(32), default="raw_text")
+    source_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # [{"stage_name", "status", "duration_ms", "error"}] in pipeline order
+    stages: Mapped[list] = mapped_column(JSON, default=list)
+    current_stage: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    investigation_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    owner_id: Mapped[Optional[str]] = mapped_column(String(36), index=True, nullable=True)

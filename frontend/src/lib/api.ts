@@ -8,6 +8,7 @@ import type {
   Session,
   User,
   HealthResponse,
+  InvestigationJob,
   InvestigationList,
   InvestigationRequest,
   InvestigationResult,
@@ -85,20 +86,24 @@ export const getCapabilities = () => json<Capabilities>("/system/capabilities");
 export const getStats = () => json<InvestigationStats>("/investigations/stats");
 export const getInvestigation = (id: string) => json<InvestigationResult>(`/investigations/${encodeURIComponent(id)}`);
 
-export function investigate(payload: InvestigationRequest): Promise<InvestigationResult> {
-  return json<InvestigationResult>("/evidence/investigate", {
+// --- Background jobs: start, then poll for per-stage progress ---
+
+export function startInvestigationJob(payload: InvestigationRequest): Promise<InvestigationJob> {
+  return json<InvestigationJob>("/evidence/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 }
 
-export function investigateFile(file: File, refang: boolean): Promise<InvestigationResult> {
+export function startFileInvestigationJob(file: File, refang: boolean): Promise<InvestigationJob> {
   const form = new FormData();
   form.append("file", file);
   form.append("refang", String(refang));
-  return json<InvestigationResult>("/evidence/investigate/file", { method: "POST", body: form });
+  return json<InvestigationJob>("/evidence/jobs/file", { method: "POST", body: form });
 }
+
+export const getJob = (id: string) => json<InvestigationJob>(`/jobs/${encodeURIComponent(id)}`);
 
 export function listInvestigations(params: { limit?: number; offset?: number; severity?: string; q?: string; mine?: boolean }) {
   const qs = new URLSearchParams();

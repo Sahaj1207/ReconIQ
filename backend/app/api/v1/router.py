@@ -6,7 +6,7 @@ or the implicit local admin when authentication is disabled); endpoints enforce 
 """
 
 from fastapi import APIRouter, Depends
-from app.api.v1.endpoints import auth, evidence, health, investigations, system
+from app.api.v1.endpoints import auth, evidence, health, investigations, jobs, system
 from app.auth.principal import current_principal
 
 api_router = APIRouter()
@@ -17,5 +17,6 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(auth.users_router, prefix="/users", tags=["Users"], dependencies=protected)
 api_router.include_router(auth.audit_router, prefix="/audit", tags=["Audit"], dependencies=protected)
 api_router.include_router(evidence.router, prefix="/evidence", tags=["Evidence Collector"], dependencies=protected)
+api_router.include_router(jobs.router, prefix="/jobs", tags=["Jobs"], dependencies=protected)
 api_router.include_router(investigations.router, prefix="/investigations", tags=["Investigations"], dependencies=protected)
 api_router.include_router(system.router, prefix="/system", tags=["System"], dependencies=protected)

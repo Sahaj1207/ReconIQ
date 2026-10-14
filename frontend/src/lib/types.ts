@@ -22,6 +22,22 @@ export interface StageMetric {
   error: string | null;
 }
 
+export type JobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface InvestigationJob {
+  job_id: string;
+  created_at: string;
+  updated_at: string;
+  status: JobStatus;
+  source_type: string;
+  source_name: string | null;
+  stages: StageMetric[];
+  current_stage: string | null;
+  progress: number;
+  investigation_id: string | null;
+  error: string | null;
+}
+
 export interface ValidationResult {
   valid: boolean;
   artifact: string;

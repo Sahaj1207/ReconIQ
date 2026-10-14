@@ -13,7 +13,7 @@ def test_fresh_database_migrates_to_head(tmp_path):
     run_migrations(eng)
     run_migrations(eng)  # idempotent
     tables = set(inspect(eng).get_table_names())
-    assert {"investigations", "alembic_version"} <= tables
+    assert {"investigations", "users", "audit_events", "investigation_jobs", "alembic_version"} <= tables
 
 
 def test_pre_migration_database_is_stamped_not_recreated(tmp_path):

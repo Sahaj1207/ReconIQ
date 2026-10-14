@@ -126,6 +126,9 @@ All settings are environment variables (or `backend/.env`). See `backend/.env.ex
 | `GET /api/v1/health` | Liveness and version (always public). |
 | `POST /api/v1/evidence/investigate` | Investigate text: `{"text": "...", "refang": true}`. |
 | `POST /api/v1/evidence/investigate/file` | Investigate an upload (multipart `file`, optional `refang`). |
+| `POST /api/v1/evidence/jobs` | Start a background investigation (same body); returns `202` with a `job_id`. The UI uses this. |
+| `POST /api/v1/evidence/jobs/file` | Start a background file investigation. Parse errors and size limits fail immediately. |
+| `GET /api/v1/jobs/{job_id}` | Poll a job: `status` (`queued`, `running`, `succeeded`, `failed`), `progress`, per-stage `stages` and, when done, `investigation_id`. Visible to its owner and admins. |
 | `POST /api/v1/evidence/extract` | Extract indicators only, no scoring. |
 | `GET /api/v1/investigations` | History: `limit`, `offset`, `severity`, `q` (search). |
 | `GET /api/v1/investigations/stats` | Totals, last 7 days, average score, severity and classification breakdowns. |

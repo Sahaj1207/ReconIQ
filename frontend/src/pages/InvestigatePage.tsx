@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { AlertOctagon } from "lucide-react";
-import { investigate, investigateFile } from "../lib/api";
+import { startFileInvestigationJob, startInvestigationJob } from "../lib/api";
 import type { Capabilities, InvestigationResult } from "../lib/types";
 import { InputPanel, type InputMode } from "../components/InputPanel";
 import { RecentList } from "../components/RecentList";
@@ -8,30 +8,31 @@ import { PipelineTimeline } from "../components/PipelineTimeline";
 import { ResultView } from "../components/ResultView";
 import { EmptyState } from "../components/EmptyState";
 import { useAuth } from "../lib/auth";
+import { JobSuperseded, useInvestigationJob } from "../lib/useInvestigationJob";
 
 export function InvestigatePage({ caps }: { caps: Capabilities | null }) {
   const [mode, setMode] = useState<InputMode>("text");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [refang, setRefang] = useState(true);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InvestigationResult | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const { job, running: loading, run: runJob } = useInvestigationJob();
+
   const run = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
-      const res = mode === "file" && file ? await investigateFile(file, refang) : await investigate({ text, refang });
+      const res = await runJob(() =>
+        mode === "file" && file ? startFileInvestigationJob(file, refang) : startInvestigationJob({ text, refang }),
+      );
       setResult(res);
       setRefreshKey((k) => k + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
+      if (!(err instanceof JobSuperseded)) setError(err instanceof Error ? err.message : String(err));
     }
-  }, [mode, file, text, refang]);
+  }, [mode, file, text, refang, runJob]);
 
   const intelConfigured = caps ? caps.threat_intel.some((p) => p.enabled) : undefined;
   const { can } = useAuth();
@@ -78,7 +79,7 @@ export function InvestigatePage({ caps }: { caps: Capabilities | null }) {
             </div>
           </div>
         )}
-        {loading && !result && <PipelineTimeline loading />}
+        {loading && <PipelineTimeline metrics={job?.stages} progress={job?.progress} loading />}
         {result ? (
           <div className={`transition-opacity ${loading ? "opacity-60" : ""}`}>
             <ResultView result={result} intelConfigured={intelConfigured} />
