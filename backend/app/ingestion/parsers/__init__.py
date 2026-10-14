@@ -40,6 +40,7 @@ MAX_TOTAL_BYTES = 100 * 1024 * 1024
 BOMB_RATIO = 100                 # uncompressed:compressed ratio treated as a decompression bomb
 MAX_MEMBER_TEXT_CHARS = 200_000  # text pulled from members into the analysed content
 MAX_LISTED_MEMBERS = 100
+MACRO_EXTENSIONS = {".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".pptm", ".potm", ".ppam"}
 
 
 @dataclass
@@ -62,12 +63,17 @@ class _Inspection:
         return text
 
 
-def _office(path: str, analysis: Dict[str, Any], insp: _Inspection) -> Dict[str, Any]:
+def _office(info: Dict[str, Any], path: str, analysis: Dict[str, Any], insp: _Inspection) -> None:
+    """Records Office analysis on a file's fingerprint and rolls macros and external links up."""
+    info["office"] = analysis
     macros = analysis.get("macros") or {}
     if macros.get("present"):
         insp.macros.append({"file": path, **macros})
     insp.external_links.extend(analysis.get("external_links") or [])
-    return analysis
+    if info["extension"] in MACRO_EXTENSIONS:
+        # The macro rules now judge this file on its actual content, not its extension
+        info["dangerous"] = False
+        info["risk_assessed_by"] = "macro analysis"
 
 
 def _inspect_zip(path: str, data: bytes, depth: int, insp: _Inspection) -> Tuple[str, Dict[str, Any]]:
@@ -146,7 +152,7 @@ def _inspect_member(path: str, filename: str, data: bytes, depth: int, insp: _In
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as zf:
                 if is_ooxml(zf):
-                    info["office"] = _office(path, analyze_ooxml(zf), insp)
+                    _office(info, path, analyze_ooxml(zf), insp)
         except (zipfile.BadZipFile, ValueError, OSError):
             pass
         if "office" not in info:
@@ -164,7 +170,7 @@ def _inspect_member(path: str, filename: str, data: bytes, depth: int, insp: _In
             for att in email_info.get("attachments", []):
                 _inspect_member(f"{path}/{att['filename']}", att["filename"], att.pop("_data", b""), depth, insp)
         except MsgParseError:
-            info["office"] = _office(path, analyze_ole_document(data), insp)
+            _office(info, path, analyze_ole_document(data), insp)
     elif kind == "pdf":
         pdf_text, _ = parse_pdf(data, scan_images=False)
         text = insp.take_text(pdf_text)
@@ -184,8 +190,9 @@ def _inspect_attachments(email_info: Dict[str, Any], insp: _Inspection) -> List[
         data = att.pop("_data", b"")
         name = att.get("filename") or "attachment"
         text, member_info = _inspect_member(f"attachment:{name}", name, data, 0, insp)
-        if "office" in member_info:
-            att["office"] = member_info["office"]
+        for key in ("office", "dangerous", "risk_assessed_by"):
+            if key in member_info:
+                att[key] = member_info[key]
         if text:
             texts.append(f"--- attachment: {name} ---\n{text}")
     return texts
@@ -220,7 +227,7 @@ def ingest_file(filename: str, data: bytes, refang: bool = True) -> IngestedInpu
         except MsgParseError as exc:
             if ext == ".msg":
                 raise UnsupportedFileError(str(exc)) from exc
-            info["office"] = _office(info["filename"], analyze_ole_document(data), insp)
+            _office(info, info["filename"], analyze_ole_document(data), insp)
             source = IngestionSourceType.BROWSER_UPLOAD
     elif info["kind"] == "pdf":
         text, info["pdf"] = parse_pdf(data)
@@ -239,7 +246,7 @@ def ingest_file(filename: str, data: bytes, refang: bool = True) -> IngestedInpu
         except (zipfile.BadZipFile, ValueError, OSError):
             office = None
         if office:
-            info["office"] = _office(info["filename"], office, insp)
+            _office(info, info["filename"], office, insp)
         else:
             text, _ = _inspect_zip(info["filename"], data, 1, insp)
         source = IngestionSourceType.BROWSER_UPLOAD

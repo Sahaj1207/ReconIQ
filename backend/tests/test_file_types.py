@@ -127,6 +127,12 @@ async def test_benign_macro_is_flagged_but_not_as_dropper():
     result = await investigate("report.xlsm", build_docm(BENIGN_MACRO))
     ids = rule_ids(result)
     assert "RULE_FIL_005" in ids and "RULE_FIL_006" not in ids
+    assert "RULE_FIL_001" not in ids and result.risk_assessment["severity"] == "LOW"
+
+
+def test_renamed_binary_keeps_its_extension_risk():
+    info = ingest_file("invoice.docm", b"MZ\x90\x00not really office").metadata["analysis"]["file"]
+    assert info["dangerous"] is True and "risk_assessed_by" not in info
 
 
 @pytest.mark.asyncio
@@ -151,7 +157,7 @@ async def test_zip_members_are_extracted_and_inspected():
     ingested = ingest_file("documents.zip", data)
     analysis = ingested.metadata["analysis"]
     outer, nested = analysis["archives"]
-    assert outer["entries"] == 3 and outer["dangerous"] == ["Invoice.pdf.exe", "report.xlsm"] and outer["nested_archives"] == 1
+    assert outer["entries"] == 3 and outer["dangerous"] == ["Invoice.pdf.exe"] and outer["nested_archives"] == 1
     assert nested["path"] == "documents.zip/inner.zip" and nested["depth"] == 2
     assert "secure-docs-share[.]top" in ingested.content  # nested member text reaches the IOC extractor
     assert analysis["macros"][0]["file"] == "documents.zip/report.xlsm"
@@ -211,7 +217,9 @@ async def test_msg_parses_like_eml_and_inspects_attachments():
 
     ids = rule_ids(await investigate("Payroll update.msg", data))
     # Existing email rules apply to .msg, plus the new deceptive-link and macro rules
-    assert {"RULE_EML_001", "RULE_EML_002", "RULE_EML_003", "RULE_EML_004", "RULE_FIL_001", "RULE_FIL_006"} <= ids
+    assert {"RULE_EML_001", "RULE_EML_002", "RULE_EML_003", "RULE_EML_004", "RULE_FIL_006"} <= ids
+    # The .docm is judged by its macro content rather than its extension, so it isn't counted twice
+    assert "RULE_FIL_001" not in ids and email["attachments"][0]["risk_assessed_by"] == "macro analysis"
 
 
 def test_msg_without_internet_headers_and_invalid_msg():
@@ -247,3 +255,27 @@ async def test_qr_code_in_pdf_image_is_decoded():
     assert images["scanned"] >= 1 and images["qr_payloads"] == ["https://pay-parking-fine.top/ticket"]
     assert "pay-parking-fine.top" in ingested.content
     assert "RULE_FIL_008" in rule_ids(await investigate("fine.pdf", data))
+
+
+# --- PDF auto-open actions ---
+
+def test_pdf_open_action_counts_only_when_it_runs_something():
+    fpdf = pytest.importorskip("fpdf")
+    pypdf = pytest.importorskip("pypdf")
+    plain = fpdf.FPDF()
+    plain.add_page()
+    plain.set_font("helvetica", size=12)
+    plain.cell(0, 10, "Quarterly report")
+    data = bytes(plain.output())
+    assert b"/OpenAction" in data  # fpdf opens at page 1 with a destination array
+    assert ingest_file("report.pdf", data).metadata["analysis"]["file"]["pdf"]["active_content"] == []
+
+    from pypdf.generic import DictionaryObject, NameObject, TextStringObject
+    writer = pypdf.PdfWriter(clone_from=io.BytesIO(data))
+    writer.root_object[NameObject("/OpenAction")] = DictionaryObject({
+        NameObject("/S"): NameObject("/JavaScript"), NameObject("/JS"): TextStringObject("app.alert('hi');"),
+    })
+    buf = io.BytesIO()
+    writer.write(buf)
+    markers = ingest_file("script.pdf", buf.getvalue()).metadata["analysis"]["file"]["pdf"]["active_content"]
+    assert {"/OpenAction", "/JavaScript", "/JS"} <= set(markers)

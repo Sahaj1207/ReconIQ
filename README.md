@@ -24,7 +24,7 @@ ATT&CK. An AI analyst then explains the result in plain language.
 | **Email analysis** | SPF/DKIM/DMARC verdicts, display name, reply-to and return-path routing, relay IPs, HTML link targets, attachment fingerprints. |
 | **File analysis** | Magic-byte typing, hashes, dangerous-type and extension-mismatch detection, PDF links and active content (`/JavaScript`, `/OpenAction`, `/Launch`…), APK package, permissions and embedded URLs. |
 | **Threat intelligence** | VirusTotal, AbuseIPDB, URLhaus, Google Safe Browsing, Have I Been Pwned (key-based) and Shodan InternetDB and RDAP domain age (keyless). Concurrent, cached and rate-limited, with graceful degradation. |
-| **Risk engine** | 32 deterministic rules → 0–100 score, severity, confidence, primary classification, ranked threat categories, MITRE ATT&CK techniques and CWE references, with a full audit trail. |
+| **Risk engine** | 35 deterministic rules → 0–100 score, severity, confidence, primary classification, ranked threat categories, MITRE ATT&CK techniques and CWE references, with a full audit trail. |
 | **AI analyst** | Claude writes an executive summary, key findings and recommended actions when `ANTHROPIC_API_KEY` is set; otherwise a deterministic template does. |
 | **Reports** | PDF and Markdown (indicators defanged), STIX 2.1 bundles (observables, indicators, attack-patterns, relationships, report) and raw JSON. |
 | **History** | Every investigation is stored (SQLite by default, PostgreSQL supported) with search, severity filters and dashboard statistics. |
@@ -37,7 +37,7 @@ ATT&CK. An AI analyst then explains the result in plain language.
 
 ```
 Input ─► Ingestion ─► Evidence collection ─► Normalization ─► Validation ─► Threat intel ─► Risk engine ─► AI analyst
-(text,   (parsers:     (IOC extractor +       (refang,          (RFC/TLD/     (7 providers,   (32 rules,     (explains;
+(text,   (parsers:     (IOC extractor +       (refang,          (RFC/TLD/     (7 providers,   (35 rules,     (explains;
  files)   eml, pdf,     seeded file hashes)    canonicalize)     scope checks)  concurrent)     ATT&CK, CWE)   never scores)
           qr, apk)
                                                                                                  │
@@ -91,11 +91,17 @@ codes and fingerprinted.
 ### Tests
 
 ```bash
-cd backend && python -m pytest -q      # 117 tests, fully offline (HTTP providers and Claude are mocked)
+cd backend && python -m pytest -q      # 154 tests, fully offline (HTTP providers and Claude are mocked)
+cd frontend && npm test                # Vitest + Testing Library component tests (jsdom)
 cd frontend && npm run build           # type-check + production build
 ```
 
-CI (`.github/workflows/ci.yml`) runs both, then builds the Docker images.
+`backend/tests/test_accuracy.py` scores a labelled set of 35 benign and malicious samples
+(`backend/tests/samples/labeled_samples.json` plus generated Office, ZIP, `.msg` and PDF files) and fails if
+accuracy drops below 95%, precision below 95% or recall below 90%. A sample counts as flagged at MEDIUM (score ≥ 40).
+Run it with `-s` to print the per-sample table. It is a small hand-made regression set, not a benchmark.
+
+CI (`.github/workflows/ci.yml`) runs all of these, then builds the Docker images.
 
 ---
 
@@ -179,6 +185,9 @@ Scores are the capped sum of matched rule weights. Severity bands: 0–19 Inform
 | RULE_EVI_011 | Executable Payload Download | HIGH | 50 |
 | RULE_CNT_001 | Credential Phishing Language | MEDIUM | 25 |
 | RULE_CNT_002 | Financial or Tech-Support Scam Language | MEDIUM | 25 |
+| RULE_CNT_003 | Gift Card or Payment Diversion Request | HIGH | 50 |
+| RULE_CNT_004 | Tech-Support Scam With Call-Back Number | HIGH | 50 |
+| RULE_CNT_005 | Credential Lure Behind an Obscured Link | MEDIUM | 25 |
 | RULE_EML_001 | Email Authentication Failure | HIGH | 50 |
 | RULE_EML_002 | Reply-To / Return-Path Mismatch | MEDIUM | 25 |
 | RULE_EML_003 | Display Name Spoofing | MEDIUM | 25 |

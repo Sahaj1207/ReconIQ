@@ -128,6 +128,81 @@ class ScamLanguageRule(_Rule):
         return False, [], {}
 
 
+PAYMENT_REQUEST_TERMS = [
+    "gift card", "gift cards", "itunes card", "google play card", "steam card", "scratch the code", "send the codes",
+    "send me the codes", "wire transfer", "wire the funds", "new bank account", "change of bank", "updated bank details",
+    "change our bank", "payment to the new account",
+]
+SECRECY_TERMS = [
+    "in a meeting", "can't call", "cannot call", "can't talk", "keep this confidential", "keep this between us",
+    "don't tell", "do not tell", "personal email", "are you at your desk", "are you available", "quick favor",
+    "discreet",
+]
+
+
+class PaymentDiversionRule(_Rule):
+    def __init__(self) -> None:
+        super().__init__(
+            "RULE_CNT_003", "Gift Card or Payment Diversion Request",
+            "Asks for gift cards, a wire transfer or changed bank details while adding urgency or secrecy (BEC)",
+            RiskWeights.HIGH, "HIGH",
+            categories=["financial_scam"], mitre=["T1566", "T1656"], cwe=["CWE-451"],
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> RuleResult:
+        text = context.get("raw_text", "").lower()
+        payment = [t for t in PAYMENT_REQUEST_TERMS if t in text]
+        pressure = [t for t in URGENCY_TERMS + SECRECY_TERMS if t in text]
+        if payment and pressure:
+            return True, [self.finding(
+                "Business Email Compromise Pattern",
+                f"Payment request ({', '.join(payment[:2])}) under pressure ({', '.join(pressure[:3])})",
+            )], {"payment_terms": payment, "pressure_terms": pressure}
+        return False, [], {}
+
+
+class CallbackScamRule(_Rule):
+    def __init__(self) -> None:
+        super().__init__(
+            "RULE_CNT_004", "Tech-Support Scam With Call-Back Number",
+            "Fake security warning that pushes the reader to phone a number or grant remote access",
+            RiskWeights.HIGH, "HIGH",
+            categories=["tech_support_fraud"], mitre=["T1566.004", "T1656"],
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> RuleResult:
+        text = context.get("raw_text", "").lower()
+        terms = [t for t in SCAM_TERMS["tech_support_fraud"] if t in text]
+        phones = context.get("evidence", {}).get("phone_numbers", [])
+        if len(terms) >= 2 and phones:
+            return True, [self.finding(
+                "Call-Back Support Scam",
+                f"Scareware phrasing ({', '.join(terms[:3])}) with a call-back number {phones[0]}", phones[0],
+            )], {"terms": terms, "phone_numbers": phones}
+        return False, [], {}
+
+
+class ObscuredCredentialLureRule(_Rule):
+    def __init__(self) -> None:
+        super().__init__(
+            "RULE_CNT_005", "Credential Lure Behind an Obscured Link",
+            "Urgent credential or payment-detail request whose link hides its destination (shortener, IP or punycode)",
+            RiskWeights.MEDIUM, "MEDIUM",
+            categories=["credential_harvesting", "phishing_email"], mitre=["T1566.002", "T1608.005"], cwe=["CWE-601"],
+        )
+
+    def evaluate(self, context: Dict[str, Any]) -> RuleResult:
+        text = context.get("raw_text", "").lower()
+        if not ([t for t in URGENCY_TERMS if t in text] and [t for t in CREDENTIAL_TERMS + ["payment details"] if t in text]):
+            return False, [], {}
+        hidden = [h for h in _hostnames(context)
+                  if h in URL_SHORTENERS or "xn--" in h or re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", h)]
+        if hidden:
+            return True, [self.finding("Lure With Hidden Destination",
+                                       f"Urgent credential request links through {hidden[0]}", hidden[0])], {"hosts": hidden}
+        return False, [], {}
+
+
 # --- Infrastructure Rules ---
 
 BRANDS: Dict[str, List[str]] = {
@@ -649,6 +724,9 @@ class NewlyRegisteredDomainRule(_Rule):
 EXTENDED_RULES = [
     CredentialPhishingLanguageRule,
     ScamLanguageRule,
+    PaymentDiversionRule,
+    CallbackScamRule,
+    ObscuredCredentialLureRule,
     BrandImpersonationDomainRule,
     DeceptiveKeywordDomainRule,
     PunycodeDomainRule,

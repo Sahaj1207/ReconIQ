@@ -27,6 +27,18 @@ def _active_content(data: bytes) -> List[str]:
     return found
 
 
+def _is_navigation_only(reader) -> bool:
+    """True when the document's /OpenAction just opens a page view (a destination or GoTo), not a script or launch."""
+    try:
+        action = reader.trailer["/Root"].get("/OpenAction")
+        action = action.get_object() if hasattr(action, "get_object") else action
+        if isinstance(action, list):  # explicit destination, e.g. [page /FitH null]
+            return True
+        return hasattr(action, "get") and action.get("/S") == "/GoTo"
+    except Exception:
+        return False
+
+
 def _scan_images(reader, analysis: Dict[str, Any]) -> List[str]:
     """QR-decodes (and OCRs, when Tesseract is available) images embedded in the first pages."""
     images: Dict[str, Any] = {"scanned": 0, "qr_payloads": [], "ocr_characters": 0}
@@ -85,6 +97,8 @@ def parse_pdf(data: bytes, scan_images: bool = True) -> Tuple[str, Dict[str, Any
             except Exception:
                 analysis["error"] = "PDF is encrypted"
                 return "", analysis
+        if "/OpenAction" in analysis["active_content"] and _is_navigation_only(reader):
+            analysis["active_content"].remove("/OpenAction")
         analysis["pages"] = len(reader.pages)
         meta = reader.metadata or {}
         analysis["metadata"] = {k.lstrip("/"): str(v) for k, v in meta.items() if v}
