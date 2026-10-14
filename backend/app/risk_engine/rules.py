@@ -24,6 +24,18 @@ from app.risk_engine.weights import RiskWeights
 
 logger = logging.getLogger(__name__)
 
+# Framework context for the original rule library (new rules declare theirs inline).
+RULE_METADATA: Dict[str, Dict[str, List[str]]] = {
+    "RULE_VAL_001": {"categories": ["suspicious_infrastructure"], "mitre": ["T1036"], "cwe": ["CWE-451"]},
+    "RULE_VAL_002": {"categories": ["suspicious_infrastructure"], "mitre": ["T1036", "T1583.001"], "cwe": ["CWE-451"]},
+    "RULE_VAL_003": {"categories": ["email_spoofing"], "mitre": ["T1656"], "cwe": ["CWE-290"]},
+    "RULE_INT_001": {"categories": ["suspicious_infrastructure"], "mitre": ["T1583.001", "T1071.001"]},
+    "RULE_INT_002": {"categories": ["suspicious_infrastructure"], "mitre": ["T1583.001", "T1071.001"]},
+    "RULE_EVI_001": {"categories": ["phishing_email"], "mitre": ["T1027"]},
+    "RULE_EVI_002": {"categories": ["suspicious_infrastructure"]},
+    "RULE_EVI_003": {"categories": ["suspicious_infrastructure"], "mitre": ["T1583.003"]},
+}
+
 
 class BaseRule(ABC):
     """
@@ -37,7 +49,10 @@ class BaseRule(ABC):
         description: str,
         weight: float,
         severity: str,
-        enabled: bool = True
+        enabled: bool = True,
+        categories: Optional[List[str]] = None,
+        mitre: Optional[List[str]] = None,
+        cwe: Optional[List[str]] = None,
     ) -> None:
         self.id = rule_id
         self.name = name
@@ -45,6 +60,10 @@ class BaseRule(ABC):
         self.weight = weight
         self.severity = severity
         self.enabled = enabled
+        meta = RULE_METADATA.get(rule_id, {})
+        self.categories: List[str] = categories if categories is not None else meta.get("categories", [])
+        self.mitre: List[str] = mitre if mitre is not None else meta.get("mitre", [])
+        self.cwe: List[str] = cwe if cwe is not None else meta.get("cwe", [])
 
     @abstractmethod
     def evaluate(self, context: Dict[str, Any]) -> Tuple[bool, List[RiskFinding], Dict[str, Any]]:
@@ -409,6 +428,11 @@ class RuleRegistry:
         self.register_rule(DefangedIndicatorDetectedRule())
         self.register_rule(MultipleSuspiciousArtifactsRule())
         self.register_rule(PublicIPPresentRule())
+
+        # Extended content, email, file and intel rule library
+        from app.risk_engine.content_rules import EXTENDED_RULES
+        for rule_cls in EXTENDED_RULES:
+            self.register_rule(rule_cls())
 
     def register_rule(self, rule: BaseRule) -> None:
         """Registers a new detection rule."""

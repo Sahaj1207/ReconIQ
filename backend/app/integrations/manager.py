@@ -99,6 +99,7 @@ class ThreatIntelManager:
             "phone_numbers": "phone",
             "phones": "phone",
             "hashes": "hash",
+            "hashes": "hash",
         }
         return category_map.get(s, s)
 

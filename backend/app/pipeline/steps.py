@@ -168,6 +168,7 @@ class RiskAssessmentStep(BasePipelineStep):
             evidence=context.normalized_evidence or context.collected_evidence,
             validation_results=context.validation_results,
             intel_results=context.threat_intelligence,
-            raw_text=raw_text_content
+            raw_text=raw_text_content,
+            ingestion=(context.raw_input.metadata or {}).get("analysis") if hasattr(context.raw_input, "metadata") else None
         )
         context.risk_assessment = assessment

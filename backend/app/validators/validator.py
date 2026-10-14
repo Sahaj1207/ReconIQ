@@ -415,6 +415,20 @@ class Validator:
                 properties={"error": f"Phone validation exception: {str(exc)}"}
             )
 
+    HASH_ALGORITHMS = {32: "md5", 40: "sha1", 64: "sha256"}
+
+    @classmethod
+    def validate_hash(cls, value: str) -> ValidationResult:
+        """Validates an MD5 / SHA-1 / SHA-256 hex digest."""
+        candidate = (value or "").strip().lower()
+        algorithm = cls.HASH_ALGORITHMS.get(len(candidate))
+        if algorithm and re.fullmatch(r"[a-f0-9]+", candidate):
+            return ValidationResult(valid=True, artifact=value, artifact_type="hash", properties={"algorithm": algorithm})
+        return ValidationResult(
+            valid=False, artifact=value, artifact_type="hash",
+            properties={"error": "Not a valid MD5, SHA-1 or SHA-256 hex digest"}
+        )
+
     @classmethod
     def validate_all(cls, evidence: Dict[str, List[str]]) -> Dict[str, List[ValidationResult]]:
         """
@@ -492,6 +506,14 @@ class Validator:
                 failures_count += 1
             phone_results.append(res)
 
+        # 7. Validate File Hashes
+        hash_results: List[ValidationResult] = []
+        for artifact in evidence.get("hashes", []):
+            res = cls.validate_hash(artifact)
+            if not res.valid:
+                failures_count += 1
+            hash_results.append(res)
+
         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
         logger.info(
@@ -506,4 +528,5 @@ class Validator:
             "domains": domain_results,
             "emails": email_results,
             "phone_numbers": phone_results,
+            "hashes": hash_results,
         }

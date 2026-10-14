@@ -106,6 +106,7 @@ class EvidenceCollector:
         merged_domains: Set[str] = set()
         merged_emails: Set[str] = set()
         merged_phone_numbers: Set[str] = set()
+        merged_hashes: Set[str] = set()
 
         # Dispatch input_data to each matching registered extractor
         for extractor in self._extractors:
@@ -127,6 +128,7 @@ class EvidenceCollector:
                 merged_domains.update(extracted_data.get("domains", []))
                 merged_emails.update(extracted_data.get("emails", []))
                 merged_phone_numbers.update(extracted_data.get("phone_numbers", []))
+                merged_hashes.update(extracted_data.get("hashes", []))
 
                 logger.debug(
                     f"Extractor [{extractor.name}] finished in {ext_duration}ms"
@@ -146,6 +148,7 @@ class EvidenceCollector:
             domains=sorted(list(merged_domains)),
             emails=sorted(list(merged_emails)),
             phone_numbers=sorted(list(merged_phone_numbers)),
+            hashes=sorted(list(merged_hashes)),
         )
 
         total_iocs = (
@@ -154,7 +157,8 @@ class EvidenceCollector:
             len(results.urls) +
             len(results.domains) +
             len(results.emails) +
-            len(results.phone_numbers)
+            len(results.phone_numbers) +
+            len(results.hashes)
         )
 
         summary = IOCSummary(
@@ -165,6 +169,7 @@ class EvidenceCollector:
             domain_count=len(results.domains),
             email_count=len(results.emails),
             phone_count=len(results.phone_numbers),
+            hash_count=len(results.hashes),
         )
 
         execution_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
