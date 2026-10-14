@@ -26,6 +26,7 @@ DANGEROUS_PERMISSIONS = {
     "android.permission.MANAGE_EXTERNAL_STORAGE", "android.permission.WRITE_SETTINGS",
 }
 MAX_DEX_BYTES = 30 * 1024 * 1024
+MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 URL_BYTES_RE = re.compile(rb"https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]{4,300}")
 
 
@@ -96,10 +97,11 @@ def parse_apk(data: bytes) -> Tuple[str, Dict[str, Any]]:
         analysis["error"] = "Not a valid APK/ZIP archive"
         return "", analysis
 
-    names = archive.namelist()
+    infos = {i.filename: i for i in archive.infolist()}
+    names = list(infos)
     analysis["file_count"] = len(names)
     analysis["has_native_code"] = any(n.startswith("lib/") and n.endswith(".so") for n in names)
-    if "AndroidManifest.xml" in names:
+    if "AndroidManifest.xml" in names and infos["AndroidManifest.xml"].file_size <= MAX_MANIFEST_BYTES:
         try:
             package, perms = parse_axml_manifest(archive.read("AndroidManifest.xml"))
             analysis["package"] = package
@@ -111,7 +113,8 @@ def parse_apk(data: bytes) -> Tuple[str, Dict[str, Any]]:
     urls = set()
     budget = MAX_DEX_BYTES
     for name in names:
-        if re.fullmatch(r"classes\d*\.dex", name) and budget > 0:
+        # Declared sizes bound decompression (zip-bomb guard)
+        if re.fullmatch(r"classes\d*\.dex", name) and 0 < infos[name].file_size <= budget:
             dex = archive.read(name)[:budget]
             budget -= len(dex)
             urls.update(m.decode("ascii", errors="ignore") for m in URL_BYTES_RE.findall(dex))

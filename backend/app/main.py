@@ -14,6 +14,8 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.api.v1.router import api_router
 from app.db import init_db
+from app import __version__
+from app.core.security import RateLimitMiddleware, SecurityHeadersMiddleware
 
 # Setup structured logging
 setup_logging()
@@ -25,7 +27,7 @@ async def lifespan(app: FastAPI):
     """
     Application startup and shutdown lifespan context.
     """
-    logger.info(f"Starting {settings.APP_NAME} v0.1.0 in [{settings.ENVIRONMENT}] environment.")
+    logger.info(f"Starting {settings.APP_NAME} v{__version__} in [{settings.ENVIRONMENT}] environment.")
     init_db()
     logger.info("Deterministic Threat Investigation Engine initialized.")
     yield
@@ -35,7 +37,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     description="ReconIQ Enterprise Threat Analysis Platform. Evidence. Intelligence. Trust.",
-    version="0.1.0",
+    version=__version__,
     debug=settings.DEBUG,
     lifespan=lifespan,
     docs_url="/docs",
@@ -53,6 +55,9 @@ if settings.CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Register API v1 Router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -63,7 +68,7 @@ async def root():
     return {
         "app": settings.APP_NAME,
         "tagline": settings.TAGLINE,
-        "version": "0.1.0",
+        "version": __version__,
         "documentation": "/docs",
         "api_v1": f"{settings.API_V1_STR}/evidence/extract"
     }

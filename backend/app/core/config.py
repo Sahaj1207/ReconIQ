@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     LOG_LEVEL: str = "INFO"
 
+    # API security: comma-separated keys enable auth; 0 disables rate limiting
+    API_KEYS: str = ""
+    RATE_LIMIT_PER_MINUTE: int = 60
+
     # Persistence (SQLite by default; use postgresql+psycopg://... in production)
     DATABASE_URL: str = "sqlite:///./reconiq.db"
     PERSIST_INVESTIGATIONS: bool = True

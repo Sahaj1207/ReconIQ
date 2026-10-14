@@ -6,6 +6,7 @@ Returns system operational status, version, and active environment.
 """
 
 from fastapi import APIRouter, status
+from app import __version__
 from app.core.config import settings
 from app.schemas.health import HealthResponse
 
@@ -26,6 +27,6 @@ async def health_check() -> HealthResponse:
     return HealthResponse(
         status="healthy",
         app_name=settings.APP_NAME,
-        version="0.1.0",
+        version=__version__,
         environment=settings.ENVIRONMENT
     )
